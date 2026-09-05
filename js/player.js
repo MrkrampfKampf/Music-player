@@ -324,9 +324,18 @@ class Player extends EventTarget {
     return url;
   }
 
-  /** Keep object URLs only for the tracks around the playhead. */
+  /**
+   * Keep object URLs only for the tracks around the playhead. The previous
+   * track is kept too: during a crossfade the outgoing element is still
+   * reading from its URL.
+   */
   _trimUrls(keepId) {
-    const keep = new Set([keepId, this.queue[this.index], this.queue[this.index + 1]].filter(Boolean));
+    const keep = new Set([
+      keepId,
+      this.queue[this.index - 1],
+      this.queue[this.index],
+      this.queue[this.index + 1],
+    ].filter(Boolean));
     for (const [id, url] of this._urls) {
       if (keep.has(id)) continue;
       URL.revokeObjectURL(url);

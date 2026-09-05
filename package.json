@@ -1,0 +1,12 @@
+{
+  "name": "resonate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An offline music and video player for your own files, installable to an iPhone Home Screen.",
+  "type": "module",
+  "scripts": {
+    "serve": "npx --yes http-server -p 8099 -c-1 .",
+    "test": "node test/tags.test.mjs && cd server && npm test",
+    "test:browser": "node test/browser.test.mjs http://127.0.0.1:8099"
+  }
+}

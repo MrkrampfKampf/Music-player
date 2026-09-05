@@ -77,9 +77,21 @@ setRouter(navigate);
 
 /* ---------------------------------------------------------------- history */
 
+/** The route that describes what is on screen right now. */
+function currentRoute() {
+  if (state.view === 'detail' && state.detail) return { ...state.detail };
+  if (state.view === 'library') return { view: 'library', tab: state.libraryTab };
+  return { view: state.view };
+}
+
 window.addEventListener('popstate', (event) => {
-  // Back closes whatever overlay is on top before it changes view.
-  if (isSheetOpen()) { closeSheet(); history.pushState(null, ''); return; }
+  // Back closes whatever overlay is on top before it changes view. Re-push the
+  // route we are actually on, so the next back still lands somewhere sensible.
+  if (isSheetOpen()) {
+    closeSheet();
+    history.pushState({ route: currentRoute() }, '');
+    return;
+  }
   if (isPlayerOpen()) { closePlayer(); return; }
 
   const route = event.state && event.state.route;

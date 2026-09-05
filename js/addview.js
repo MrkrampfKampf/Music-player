@@ -9,7 +9,7 @@
 import { library } from './library.js';
 import { Converter, ConverterError, normaliseUrl, isSpotify, QUALITY } from './converter.js';
 import { settings, saveSettings } from './settings.js';
-import { el, icon, clear, artNode, toast, formatBytes, menuSheet, plural } from './ui.js';
+import { el, icon, clear, artNode, toast, formatBytes, menuSheet, closeSheet, plural } from './ui.js';
 
 let converter = null;
 let jobs = [];
@@ -99,11 +99,11 @@ export function renderAdd(host) {
 
   /* ---------------------------------------------------------------- status */
 
-  host.append(serverStatusCard(host));
+  host.append(serverStatusCard());
   host.append(jobsSection());
 }
 
-function serverStatusCard(host) {
+function serverStatusCard() {
   const configured = !!(settings.serverUrl || '').trim();
 
   if (configured) {
@@ -301,26 +301,24 @@ function confirmPlaylist(resolved, count) {
       el('button', {
         class: 'btn wide',
         text: 'Download ' + plural(count, 'track'),
-        onclick: () => { settled = true; closeSheetNow(); resolve(true); },
+        onclick: () => { settled = true; closeSheet(); resolve(true); },
       }),
       el('button', {
         class: 'btn wide secondary',
         text: 'Cancel',
         style: { marginTop: '10px' },
-        onclick: () => { settled = true; closeSheetNow(); resolve(false); },
+        onclick: () => { settled = true; closeSheet(); resolve(false); },
       })));
 
+    // Dismissing by backdrop or swipe counts as declining the download.
     const host = document.getElementById('sheet-host');
     const observer = new MutationObserver(() => {
-      if (host.hidden && !settled) { settled = true; observer.disconnect(); resolve(false); }
+      if (!host.hidden) return;
+      observer.disconnect();
+      if (!settled) { settled = true; resolve(false); }
     });
     observer.observe(host, { attributes: true, attributeFilter: ['hidden'] });
   });
-}
-
-function closeSheetNow() {
-  document.getElementById('sheet-host').hidden = true;
-  document.body.style.overflow = '';
 }
 
 /* ------------------------------------------------------------ file import */

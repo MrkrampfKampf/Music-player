@@ -8,7 +8,7 @@ import { player } from './player.js';
 import * as db from './db.js';
 import {
   el, icon, clear, artNode, formatTime, formatDurationLong, plural,
-  qualityLabel, isHiRes, menuSheet, promptSheet, confirmSheet, toast, artworkUrl,
+  isHiRes, menuSheet, promptSheet, confirmSheet, closeSheet, toast, artworkUrl,
 } from './ui.js';
 
 let router = null;
@@ -288,8 +288,7 @@ function buildEditForm(track) {
         trackNo: parseInt(trackInput.value, 10) || null,
       });
       toast('Saved');
-      document.getElementById('sheet-host').hidden = true;
-      document.body.style.overflow = '';
+      closeSheet();
     },
   }));
 
@@ -334,8 +333,7 @@ async function lyricsSheet(track) {
         await db.putLyrics(track.id, null);
         toast('Lyrics removed');
         document.dispatchEvent(new CustomEvent('lyricschange', { detail: { trackId: track.id } }));
-        document.getElementById('sheet-host').hidden = true;
-        document.body.style.overflow = '';
+        closeSheet();
       },
     }) : null));
 }
@@ -862,8 +860,7 @@ function pickTracksSheet(playlistId) {
     confirm.addEventListener('click', async () => {
       await library.addToPlaylist(playlistId, [...chosen]);
       toast('Added ' + plural(chosen.size, 'song'));
-      document.getElementById('sheet-host').hidden = true;
-      document.body.style.overflow = '';
+      closeSheet();
       router({ view: 'playlist', key: playlistId }, true);
     });
 

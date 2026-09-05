@@ -23,7 +23,6 @@ let lyricsVisible = false;
 let currentLyrics = null;
 let lyricNodes = [];
 let lastLyricIndex = -1;
-let objectUrls = [];
 
 const $ = (id) => document.getElementById(id);
 
@@ -39,7 +38,9 @@ export function initNowPlaying() {
   $('mini-play').addEventListener('click', (event) => { event.stopPropagation(); player.toggle(); });
   $('mini-next').addEventListener('click', (event) => { event.stopPropagation(); player.next(); });
 
-  $('np-close').addEventListener('click', closePlayer);
+  // Going back is what actually closes the player, so the pushed history
+  // entry is consumed rather than left behind for the next back gesture.
+  $('np-close').addEventListener('click', () => history.back());
   $('np-play').addEventListener('click', () => player.toggle());
   $('np-next').addEventListener('click', () => player.next());
   $('np-prev').addEventListener('click', () => player.previous());
@@ -186,7 +187,6 @@ async function onTrackChange() {
     $('np-lyrics-btn').classList.remove('on');
   }
 
-  revokeAll();
   const url = await artworkUrl(track.artworkKey);
   $('mini-img').src = url || 'icons/icon-192.png';
   $('np-img').src = url || 'icons/icon-512.png';
@@ -446,11 +446,6 @@ function supportsVolume() {
   } catch {
     return false;
   }
-}
-
-function revokeAll() {
-  for (const url of objectUrls) URL.revokeObjectURL(url);
-  objectUrls = [];
 }
 
 /* ------------------------------------------------------- drag to dismiss */

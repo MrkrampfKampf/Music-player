@@ -210,8 +210,11 @@ export function confirmSheet({ title, message, confirmLabel = 'Confirm', destruc
         style: { marginTop: '10px' },
         onclick: () => { settled = true; close(); resolve(false); },
       }));
+      // A swipe or backdrop tap dismisses without touching either button.
       const observer = new MutationObserver(() => {
-        if (sheetHost().hidden && !settled) { settled = true; observer.disconnect(); resolve(false); }
+        if (!sheetHost().hidden) return;
+        observer.disconnect();
+        if (!settled) { settled = true; resolve(false); }
       });
       observer.observe(sheetHost(), { attributes: true, attributeFilter: ['hidden'] });
     });
@@ -244,7 +247,9 @@ export function promptSheet({ title, label, value = '', placeholder = '', confir
       });
       setTimeout(() => input.focus(), 120);
       const observer = new MutationObserver(() => {
-        if (sheetHost().hidden && !settled) { settled = true; observer.disconnect(); resolve(null); }
+        if (!sheetHost().hidden) return;
+        observer.disconnect();
+        if (!settled) { settled = true; resolve(null); }
       });
       observer.observe(sheetHost(), { attributes: true, attributeFilter: ['hidden'] });
     });

@@ -1,0 +1,34 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Metadata parser
+        run: node test/tags.test.mjs
+
+      - name: Converter server
+        working-directory: server
+        run: npm test
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: End-to-end in a browser
+        run: |
+          npx --yes http-server -p 8099 -c-1 . > /dev/null 2>&1 &
+          npx --yes wait-on http://127.0.0.1:8099/index.html
+          node test/browser.test.mjs http://127.0.0.1:8099
