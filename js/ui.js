@@ -71,13 +71,19 @@ export function forgetArtwork(key) {
   artUrls.delete(key);
 }
 
-/** An <span class="art"> that fills in its image once the blob is read. */
+/**
+ * An <span class="art"> that fills in its image once the blob is read.
+ *
+ * The fill must not depend on the node already being in the document: callers
+ * routinely build a whole subtree and append it a tick later, and an
+ * isConnected check here would lose that race and leave a placeholder.
+ */
 export function artNode(key, extraClass = '') {
   const wrap = el('span', { class: 'art placeholder ' + extraClass });
   wrap.append(icon('note'));
   if (key) {
     artworkUrl(key).then((url) => {
-      if (!url || !wrap.isConnected) return;
+      if (!url) return;
       clear(wrap);
       wrap.classList.remove('placeholder');
       wrap.append(el('img', { src: url, alt: '', loading: 'lazy', decoding: 'async' }));
