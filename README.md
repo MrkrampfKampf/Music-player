@@ -11,24 +11,22 @@ account involved, and it never expires.
 
 ## Getting it on your iPhone
 
-**1. Publish it.** On GitHub, open this repository's **Settings → Pages**. Under
-"Build and deployment" set Source to **Deploy from a branch**, pick `main` and
-the **/ (root)** folder, then Save. A minute later Pages gives you the address:
+**1. Open this address in Safari:**
 
 ```
 https://mrkrampfkampf.github.io/Music-player/
 ```
 
-**2. Install it.** Open that address in **Safari** on your iPhone. Tap the
-Share button, scroll down, tap **Add to Home Screen**, then **Add**.
+**2. Install it.** Tap the Share button, scroll down, tap **Add to Home
+Screen**, then **Add**.
 
 **3. Open it from the Home Screen icon**, not from Safari. That is what gives
 you the full-screen app, the lock-screen controls, and durable storage.
 
 Then tap **Add** and choose files, or paste a link.
 
-> Use Safari for the install. Chrome and Firefox on iOS cannot add a web app to
-> the Home Screen, because iOS only lets Safari do it.
+> Use Safari for this. Chrome and Firefox on iOS cannot add a web app to the
+> Home Screen, because iOS only lets Safari do it.
 
 ---
 
