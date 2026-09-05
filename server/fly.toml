@@ -1,0 +1,29 @@
+# Fly.io deployment. Run `fly launch --no-deploy` once to claim an app name,
+# then `fly secrets set ACCESS_TOKEN=... ALLOWED_ORIGINS=...` and `fly deploy`.
+app = "resonate-converter"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  MAX_DURATION = "7200"
+  MAX_CONCURRENT = "1"
+  RATE_LIMIT_PER_MINUTE = "20"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 4
+    hard_limit = 8
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

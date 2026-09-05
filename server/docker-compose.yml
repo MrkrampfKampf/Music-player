@@ -1,0 +1,13 @@
+# For running the converter on a machine you own.
+#   ACCESS_TOKEN=$(openssl rand -hex 24) docker compose up -d
+services:
+  converter:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ACCESS_TOKEN: ${ACCESS_TOKEN:?set ACCESS_TOKEN before starting}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      MAX_DURATION: "7200"
+      MAX_CONCURRENT: "2"

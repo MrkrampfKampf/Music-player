@@ -1,0 +1,15 @@
+{
+  "name": "resonate-converter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Turns a link into an audio file for the Resonate player.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node test/server.test.mjs"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,24 @@
+# Render blueprint. Point Render at this repository and it builds the
+# converter from server/Dockerfile. The free instance type sleeps when idle,
+# so the first conversion after a quiet spell takes a minute to wake up.
+services:
+  - type: web
+    name: resonate-converter
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: ACCESS_TOKEN
+        generateValue: true       # Render invents one; copy it into the app
+      - key: ALLOWED_ORIGINS
+        sync: false               # set this to your GitHub Pages origin
+      - key: MAX_DURATION
+        value: "7200"
+      - key: MAX_CONCURRENT
+        value: "1"                # the free instance has one shared CPU
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "20"
