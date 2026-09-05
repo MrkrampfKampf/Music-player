@@ -5,11 +5,13 @@
   "description": "Turns a link into an audio file for the Resonate player.",
   "type": "module",
   "main": "src/index.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node test/server.test.mjs"
+    "test": "node test/server.test.mjs && node test/cookies.test.mjs"
   },
   "dependencies": {}
 }

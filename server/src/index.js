@@ -13,7 +13,7 @@
 
 import http from 'node:http';
 import { config, VERSION } from './config.js';
-import { resolveUrl, resolveStream, ExtractError, run } from './extract.js';
+import { resolveUrl, resolveStream, ExtractError, run, initExtractorArgs, usingCookies } from './extract.js';
 import { planProfile, convertToStream, PROFILES } from './convert.js';
 
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
@@ -297,6 +297,7 @@ async function health() {
     extractor: extractor ? config.extractor + ' ' + extractor : null,
     ffmpeg: ffmpeg ? ffmpeg.split(' ').slice(0, 3).join(' ') : null,
     tokenRequired: !!config.token,
+    signedIn: usingCookies(),
     maxDurationSeconds: config.maxDurationSeconds,
     maxConcurrent: config.maxConcurrent,
     inFlight,
@@ -316,12 +317,15 @@ async function probe(command, args) {
 /* --------------------------------------------------------------------- boot */
 
 if (process.env.RESONATE_NO_LISTEN !== '1') {
+  const signedIn = initExtractorArgs();
+
   server.listen(config.port, config.host, () => {
     console.log('Resonate converter v' + VERSION + ' on ' + config.host + ':' + config.port);
     console.log('  extractor: ' + config.extractor);
     console.log('  ffmpeg:    ' + config.ffmpeg);
     console.log('  token:     ' + (config.token ? 'required' : 'NOT SET, anyone with the URL can use this server'));
     console.log('  origins:   ' + config.allowedOrigins.join(', '));
+    console.log('  cookies:   ' + (signedIn ? 'loaded' : 'none'));
   });
 
   const shutdown = () => {

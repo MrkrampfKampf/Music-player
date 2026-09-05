@@ -11,7 +11,41 @@
  */
 
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { config } from './config.js';
+
+/** Extra arguments derived from configuration, filled in at boot. */
+let derivedArgs = [];
+
+/**
+ * Write the configured cookie jar to a private file and return whether one is
+ * in use. Called once at boot; the contents are never logged.
+ */
+export function initExtractorArgs() {
+  derivedArgs = [];
+  if (!config.cookiesB64) return false;
+
+  try {
+    const jar = Buffer.from(config.cookiesB64, 'base64').toString('utf8');
+    if (!/^#|\t/m.test(jar)) {
+      console.warn('COOKIES_B64 does not look like a Netscape cookies.txt; ignoring it.');
+      return false;
+    }
+    const target = path.join(os.tmpdir(), 'extractor-cookies.txt');
+    fs.writeFileSync(target, jar, { mode: 0o600 });
+    derivedArgs = ['--cookies', target];
+    return true;
+  } catch (err) {
+    console.warn('Could not read COOKIES_B64:', err.message);
+    return false;
+  }
+}
+
+export function usingCookies() {
+  return derivedArgs.length > 0;
+}
 
 export class ExtractError extends Error {
   constructor(message, { status = 502, hint = '' } = {}) {
@@ -126,6 +160,7 @@ export async function resolveUrl(url) {
     '--no-warnings',
     '--no-progress',
     '--playlist-end', String(config.maxPlaylistItems),
+    ...derivedArgs,
     ...config.extractorArgs,
     url,
   ];
@@ -184,6 +219,7 @@ export async function resolveStream(url, preferOriginal) {
     '--no-progress',
     '--no-playlist',
     '-f', format,
+    ...derivedArgs,
     ...config.extractorArgs,
     url,
   ];

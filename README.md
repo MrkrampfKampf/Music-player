@@ -80,6 +80,11 @@ else is needed.
 yourself. Setting it up takes about five minutes and can be done entirely from
 your phone. See **[server/README.md](server/README.md)**.
 
+Worth knowing before you bother: SoundCloud, Bandcamp and podcast feeds work
+fine from a free host. YouTube mostly does not, because every free host runs on
+datacentre addresses that YouTube now blocks on sight. The server README covers
+what helps.
+
 ### About Spotify
 
 Spotify audio is DRM encrypted. It cannot be converted to MP3 by this app or by

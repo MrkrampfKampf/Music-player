@@ -9,35 +9,83 @@ external extractor that it runs as a subprocess.
 
 ---
 
-## Deploying it from your phone
+## What actually works from a free server
 
-You do not need a computer for this. Render's free tier works, builds straight
-from this repository, and is set up entirely in a browser.
+Read this before spending time on setup, because it decides whether the thing
+is worth it to you.
 
-1. Sign in at **render.com** with your GitHub account.
-2. **New → Web Service**, and pick this repository.
-3. Set **Root Directory** to `server`, and **Runtime** to `Docker`. Render
-   finds the Dockerfile on its own.
-4. Choose the **Free** instance type.
-5. Under Environment, add:
-   - `ACCESS_TOKEN` — a long random string. Make one up; 30+ characters.
-   - `ALLOWED_ORIGINS` — your Pages address with no trailing slash, for
-     example `https://yourname.github.io`.
-6. Create the service and wait for the first build. It takes a few minutes
-   because the image installs ffmpeg and the extractor.
-7. Copy the service address, something like
-   `https://resonate-converter.onrender.com`.
-8. In the app: **Settings → Converter server**. Paste the address, paste the
-   same token, then tap **Test connection**.
+| Source | From a free cloud server |
+|---|---|
+| Direct file links (`.mp3`, `.m4a`, `.wav`, `.mp4`) | Work. These do not even need the server. |
+| SoundCloud, Bandcamp, podcast feeds, most small sites | Work reliably. |
+| **YouTube** | **Usually blocked.** See below. |
+| Spotify | Impossible anywhere. The audio is DRM encrypted. |
 
-There is a `render.yaml` blueprint in this folder if you would rather use
+**The YouTube problem.** Every free host runs on datacentre IP addresses, and
+YouTube has spent 2025 and 2026 getting good at spotting those. A request from
+Render, Koyeb, Fly, AWS or Google Cloud now tends to come back with "Sign in to
+confirm you're not a bot" within the first handful of downloads, where a home
+connection might manage dozens. This is not something the server can be
+configured around; it is about where the request comes from.
+
+Two things help:
+
+- **Sign the server in.** Set `COOKIES_B64` to a base64 encoded Netscape
+  `cookies.txt` exported from a browser where you are logged in. The extractor
+  then presents that session, which is what the message is asking for. The jar
+  is a live login, so treat it like a password, and use a throwaway account
+  rather than your main one: sites do sometimes invalidate or flag a session
+  used this way.
+- **Run it at home instead.** A machine on your own connection has a
+  residential address and does not hit this at all. See below.
+
+If you mainly want SoundCloud and direct links, a free host is fine and you can
+stop reading here.
+
+---
+
+## Deploying it free, from a phone
+
+You do not need a computer. Two hosts work well and are set up in a browser.
+
+### Koyeb, the easier one
+
+No credit card, and it does not ask for one unless it cannot tell you are
+human. One free service: 512 MB RAM, 0.1 vCPU, Frankfurt or Washington.
+
+1. Sign in at **koyeb.com** with your GitHub account.
+2. **Create Web Service**, choose **GitHub**, pick this repository.
+3. Set the **work directory** to `server` and the builder to **Dockerfile**.
+4. Instance type **Free**, region **Frankfurt**.
+5. Under Environment variables add:
+   - `ACCESS_TOKEN` — a long random string you invent, 30+ characters.
+   - `ALLOWED_ORIGINS` — your Pages origin, no trailing slash.
+   - `MAX_CONCURRENT` — `1`.
+6. Set the **port** to `8080` and deploy.
+7. Copy the address it gives you, something like
+   `https://something-yourname.koyeb.app`.
+8. In the app: **Settings → Converter server**. Paste the address and the same
+   token, then tap **Test connection**.
+
+0.1 vCPU sounds tiny, and it is, but the default quality profile only remuxes
+the audio rather than re-encoding it, so there is almost nothing for the CPU to
+do. Choosing MP3 320 instead will be noticeably slow on this tier.
+
+The service sleeps after an hour with no traffic and cannot be kept awake on
+the free plan, so the first conversion after a quiet spell waits for a cold
+start.
+
+### Render, if you would rather
+
+Same shape, slightly more polished, but it asks for a card even on the free
+plan. **New → Web Service**, pick this repository, **Root Directory** `server`,
+runtime **Docker**, instance type **Free**, then the same environment
+variables. There is a `render.yaml` blueprint in this folder if you prefer
 Render's Blueprints flow, and a `fly.toml` for Fly.io.
 
-> **Free tier caveats.** A free Render service sleeps after 15 minutes idle, so
-> the first conversion after a quiet spell waits about a minute for the machine
-> to wake. Free hosts also share datacentre IP addresses, and some sites block
-> those, which shows up as "the source is blocking this server". A machine at
-> home on your own connection does not have that problem.
+Render's free services sleep after 15 minutes idle.
+
+---
 
 ## Running it at home
 
@@ -72,6 +120,7 @@ Every setting is an environment variable. See `.env.example`.
 | `ALLOWED_ORIGINS` | `*` | Comma-separated origins allowed to call the server. Narrow this to your Pages origin once things work. |
 | `EXTRACTOR` | `yt-dlp` | The program that turns a page URL into a stream URL. Anything that speaks yt-dlp's `--dump-single-json` output works. |
 | `EXTRACTOR_ARGS` | *(empty)* | Extra arguments passed to it, space separated. |
+| `COOKIES_B64` | *(empty)* | A Netscape `cookies.txt`, base64 encoded, written to a private file at boot and handed to the extractor. A live session: treat it like a password. |
 | `FFMPEG` | `ffmpeg` | Path to ffmpeg. |
 | `PORT` | `8080` | Listen port. |
 | `MAX_DURATION` | `10800` | Refuse anything longer, in seconds. |
@@ -106,6 +155,7 @@ All endpoints need `Authorization: Bearer <ACCESS_TOKEN>` when a token is set.
   "extractor": "yt-dlp 2026.01.01",
   "ffmpeg": "ffmpeg version 6.1",
   "tokenRequired": true,
+  "signedIn": false,
   "maxDurationSeconds": 7200,
   "inFlight": 0,
   "qualities": ["original", "mp3_320", "mp3_v0", "m4a_256"]
@@ -182,5 +232,6 @@ npm test
 ```
 
 Starts the real server against a stub extractor and checks auth, CORS, the URL
-guards, resolve, error mapping and the length limit. 34 assertions, no network
+guards, resolve, error mapping and the length limit, then checks that a cookie
+jar is written privately and that junk is refused. 42 assertions, no network
 needed.

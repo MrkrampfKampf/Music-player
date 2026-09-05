@@ -26,6 +26,16 @@ export const config = {
   extractor: process.env.EXTRACTOR || 'yt-dlp',
   extractorArgs: (process.env.EXTRACTOR_ARGS || '').split(' ').filter(Boolean),
 
+  /**
+   * A Netscape-format cookies.txt, base64 encoded, written to disk at boot and
+   * handed to the extractor. Some sites answer a request from a datacentre
+   * address by asking it to sign in; these are how the server signs in as you.
+   *
+   * Treat it like a password: it is your live session. Prefer a throwaway
+   * account, since a site may invalidate or flag the session it belongs to.
+   */
+  cookiesB64: process.env.COOKIES_B64 || '',
+
   ffmpeg: process.env.FFMPEG || 'ffmpeg',
 
   /** Guard rails. A converter with no limits is a free CPU faucet. */
