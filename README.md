@@ -12,9 +12,12 @@ account involved, and it never expires.
 ## Getting it on your iPhone
 
 **1. Publish it.** On GitHub, open this repository's **Settings → Pages**. Under
-"Build and deployment" set Source to **Deploy from a branch**, pick the branch
-you want and the **/ (root)** folder, then Save. A minute later Pages gives you
-an address like `https://yourname.github.io/Geberit-projekt/`.
+"Build and deployment" set Source to **Deploy from a branch**, pick `main` and
+the **/ (root)** folder, then Save. A minute later Pages gives you the address:
+
+```
+https://mrkrampfkampf.github.io/Music-player/
+```
 
 **2. Install it.** Open that address in **Safari** on your iPhone. Tap the
 Share button, scroll down, tap **Add to Home Screen**, then **Add**.
