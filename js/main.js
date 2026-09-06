@@ -7,12 +7,13 @@
  */
 
 import * as db from './db.js';
-import { library } from './library.js';
+import { library, LIKED_ID } from './library.js';
 import { player } from './player.js';
 import { settings, loadSettings, saveSettings, renderSettings, applyTheme } from './settings.js';
 import { initNowPlaying, isPlayerOpen, closePlayer } from './nowplaying.js';
 import { renderHome, renderLibrary, renderSearch, renderDetail, setRouter } from './views.js';
 import { renderDiscover, resetDiscover } from './discoverview.js';
+import { setRoomRouter } from './room.js';
 import { initAdd, renderAdd, importPickedFiles } from './addview.js';
 import { closeSheet, isSheetOpen, toast } from './ui.js';
 import { asButton, press } from './tactile.js';
@@ -51,11 +52,6 @@ function render() {
     section.hidden = section.dataset.view !== state.view;
   }
 
-  for (const button of document.querySelectorAll('[data-nav]')) {
-    const target = state.view === 'detail' ? detailParentTab() : state.view;
-    button.classList.toggle('active', button.dataset.nav === target);
-  }
-
   const main = document.getElementById('main');
 
   if (state.view === 'home') renderHome(document.getElementById('home-body'));
@@ -64,7 +60,17 @@ function render() {
       tab.setAttribute('aria-selected', String(tab.dataset.tab === state.libraryTab));
     }
     renderLibrary(document.getElementById('library-body'), state.libraryTab);
-  } else if (state.view === 'search') renderSearch(document.getElementById('search-body'), state.query);
+  } else if (state.view === 'search') {
+    for (const tab of document.querySelectorAll('#search-tabs [data-scope]')) {
+      tab.setAttribute('aria-selected', String(tab.dataset.scope === state.searchScope));
+    }
+    const input = document.getElementById('search-input');
+    input.placeholder = state.searchScope === 'online'
+      ? 'Artists, albums, songs, genres' : 'Songs, albums, artists';
+    const body = document.getElementById('search-body');
+    if (state.searchScope === 'online') renderDiscover(body, state.query);
+    else renderSearch(body, state.query);
+  }
   else if (state.view === 'add') renderAdd(document.getElementById('add-body'));
   else if (state.view === 'settings') renderSettings(document.getElementById('settings-body'));
   else if (state.view === 'detail' && state.detail) renderDetail(document.getElementById('detail-body'), state.detail);
@@ -72,11 +78,24 @@ function render() {
   main.scrollTop = 0;
 }
 
-function detailParentTab() {
-  return 'library';
-}
-
 setRouter(navigate);
+
+// The room's objects route by name.
+setRoomRouter((where) => {
+  if (where === 'player') {
+    if (player.current) openPlayerFromRoom();
+    else navigate({ view: 'library', tab: 'songs' });
+  } else if (where === 'library') navigate({ view: 'library', tab: 'albums' });
+  else if (where === 'settings') navigate({ view: 'settings' });
+  else if (where === 'add') navigate({ view: 'add' });
+  else if (where === 'search') { state.searchScope = 'library'; navigate({ view: 'search' }); }
+  else if (where === 'find') { state.searchScope = 'online'; resetDiscover(); navigate({ view: 'search' }); }
+  else if (where === 'liked') navigate({ view: 'playlist', key: LIKED_ID });
+});
+
+function openPlayerFromRoom() {
+  document.getElementById('mini').click();
+}
 
 /* ---------------------------------------------------------------- history */
 
@@ -105,17 +124,10 @@ window.addEventListener('popstate', (event) => {
 /* --------------------------------------------------------------- controls */
 
 function wireChrome() {
-  for (const button of document.querySelectorAll('[data-nav]')) {
+  // Everything comes back to the room, from the same place on every screen.
+  for (const button of document.querySelectorAll('[data-back]')) {
     asButton(button);
-    button.addEventListener('click', () => {
-      const target = button.dataset.nav;
-      // Tapping the tab you are already on scrolls back to the top.
-      if (state.view === target) {
-        document.getElementById('main').scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      navigate({ view: target });
-    });
+    button.addEventListener('click', () => navigate({ view: 'home' }));
   }
 
   for (const tab of document.querySelectorAll('#library-tabs [data-tab]')) {
@@ -180,6 +192,9 @@ function wireChrome() {
   });
 
   document.querySelector('.sheet-backdrop').addEventListener('click', closeSheet);
+
+  // Views ask to move elsewhere without reaching into the router themselves.
+  document.addEventListener('goto', (event) => navigate(event.detail));
 
   // Keyboard shortcuts, useful with a hardware keyboard or on desktop.
   document.addEventListener('keydown', (event) => {

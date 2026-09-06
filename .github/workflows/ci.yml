@@ -32,6 +32,7 @@ jobs:
           npx --yes http-server -p 8099 -c-1 . > /dev/null 2>&1 &
           npx --yes wait-on http://127.0.0.1:8099/index.html
           node test/browser.test.mjs http://127.0.0.1:8099
+          node test/room.test.mjs http://127.0.0.1:8099
           node test/mediasession.test.mjs http://127.0.0.1:8099
           node test/physical.test.mjs http://127.0.0.1:8099
           node test/discover.test.mjs http://127.0.0.1:8099

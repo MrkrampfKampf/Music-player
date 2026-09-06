@@ -146,7 +146,7 @@ function serverStatusCard() {
         class: 'btn secondary',
         style: { marginTop: '10px' },
         text: 'Open Settings',
-        onclick: () => document.querySelector('[data-nav="settings"]').click(),
+        onclick: () => document.dispatchEvent(new CustomEvent('goto', { detail: { view: 'settings' } })),
       })));
 }
 

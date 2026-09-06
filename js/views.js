@@ -11,6 +11,7 @@ import {
   isHiRes, menuSheet, promptSheet, confirmSheet, closeSheet, toast, artworkUrl,
 } from './ui.js';
 import { tick, press } from './tactile.js';
+import { renderRoom } from './room.js';
 
 let router = null;
 export function setRouter(fn) { router = fn; }
@@ -413,66 +414,44 @@ export async function renderHome(host) {
   if (!library.tracks.length) {
     host.append(emptyState({
       icon: 'note',
-      title: 'Your library is empty',
-      body: 'Add songs from the Files app, or paste a link on the Add tab to pull one in.',
+      title: 'The room is empty',
+      body: 'Bring some records in and the deck has something to play. Add files from '
+        + 'your iPhone, or find music on the Add and Search tabs.',
       action: { label: 'Add music', onSelect: () => document.getElementById('file-input').click() },
     }));
     return;
   }
 
-  const liked = library.likedTracks;
-  const recentlyPlayed = await library.recentlyPlayed(12);
-  const recentlyAdded = library.recentlyAdded;
-  const mostPlayed = library.mostPlayed;
+  // Home is the studio. The equipment is the navigation.
+  host.append(renderRoom(el('div', {})));
 
-  // Hero: pick up where you left off, or a shuffle of everything.
-  const heroTrack = recentlyPlayed[0] || recentlyAdded[0];
-  if (heroTrack) {
-    const hero = el('button', { class: 'hero' });
-    artworkUrl(heroTrack.artworkKey).then((url) => {
-      if (url && hero.isConnected) hero.prepend(el('img', { src: url, alt: '' }));
+  // What is on the deck, and a plain way through for anyone who would rather
+  // not hunt for an object.
+  const current = player.current || (await library.recentlyPlayed(1))[0] || library.recentlyAdded[0];
+  if (current) {
+    const strip = el('button', { class: 'room-strip' },
+      artNode(current.artworkKey),
+      el('span', { class: 'room-strip-text' },
+        el('b', { text: current.title }),
+        el('span', { class: 'silk', text: player.playing ? 'Playing now' : 'On the deck' })),
+      el('span', { class: 'icon-btn' }, icon(player.playing ? 'pause' : 'play')));
+    strip.addEventListener('click', () => {
+      if (player.current) player.toggle();
+      else player.play([current], 0);
+      renderHome(host);
     });
-    hero.append(el('div', { class: 'hero-body' },
-      el('div', { class: 'hero-kicker', text: recentlyPlayed.length ? 'Pick up where you left off' : 'Recently added' }),
-      el('div', { class: 'hero-title', text: heroTrack.title }),
-      el('div', { class: 'hero-sub', text: heroTrack.artist })));
-    hero.addEventListener('click', () => {
-      const list = recentlyPlayed.length ? recentlyPlayed : recentlyAdded;
-      player.play(list, Math.max(0, list.findIndex((t) => t.id === heroTrack.id)));
-    });
-    host.append(hero);
+    host.append(strip);
   }
 
-  const quick = el('div', { class: 'detail-actions', style: { marginTop: '16px' } },
-    el('button', { class: 'btn', onclick: () => player.play(library.mix(60), 0) },
-      icon('shuffle', 20), el('span', { text: 'Shuffle All' })),
-    el('button', { class: 'btn secondary', onclick: () => router({ view: 'playlist', key: LIKED_ID }) },
-      icon('heart', 20), el('span', { text: 'Liked' })));
-  host.append(quick);
-
-  if (recentlyPlayed.length) {
-    host.append(shelf('Recently Played', recentlyPlayed.map((t) => trackCard(t, recentlyPlayed))));
-  }
-  if (liked.length) {
-    host.append(shelf('Liked Songs', liked.slice(0, 15).map((t) => trackCard(t, liked)),
-      () => router({ view: 'playlist', key: LIKED_ID })));
-  }
-  host.append(shelf('Recently Added', recentlyAdded.slice(0, 15).map((t) => trackCard(t, recentlyAdded))));
-
-  if (mostPlayed.length >= 3) {
-    host.append(shelf('On Repeat', mostPlayed.slice(0, 15).map((t) => trackCard(t, mostPlayed))));
-  }
-
-  const albums = library.albums;
-  if (albums.length >= 2) {
-    host.append(shelf('Albums', albums.slice(0, 15).map(albumCard),
-      () => router({ view: 'library', tab: 'albums' })));
-  }
-  const artists = library.artists;
-  if (artists.length >= 2) {
-    host.append(shelf('Artists', artists.slice(0, 15).map(artistCard),
-      () => router({ view: 'library', tab: 'artists' })));
-  }
+  host.append(el('div', { class: 'room-doors' },
+    [['Library', () => router({ view: 'library', tab: 'albums' })],
+      ['Liked', () => router({ view: 'playlist', key: LIKED_ID })],
+      ['Playlists', () => router({ view: 'library', tab: 'playlists' })]]
+      .map(([label, onSelect]) => el('button', {
+        class: 'chip',
+        text: label,
+        onclick: () => { press(); onSelect(); },
+      }))));
 }
 
 function greetingText() {

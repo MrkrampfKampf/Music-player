@@ -16,6 +16,22 @@ let pass=0, fail=0;
 const check=(n,ok,x='')=>{if(ok){pass++;log('  ok   '+n);}else{fail++;log('  FAIL '+n+(x?' :: '+x:''));}};
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8099';
+
+
+
+/**
+ * Navigate the way the app itself does. The room is the only chrome, and it
+ * only exists once there is something in the library, so these tests ask the
+ * router directly rather than depending on a populated room. room.test.mjs is
+ * the one that clicks the actual objects.
+ */
+async function open(page, view, extra = {}) {
+  await page.evaluate(([v, x]) => {
+    document.dispatchEvent(new CustomEvent('goto', { detail: { view: v, ...x } }));
+  }, [view, extra]);
+  await page.waitForTimeout(450);
+}
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 2 });
 const errors=[]; page.on('pageerror',e=>errors.push(e.message));
@@ -48,7 +64,7 @@ await page.route('**/metadata/gd1977', (route) => route.fulfill({
 
 await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
-await page.click('[data-nav="search"]');
+await open(page, 'search');
 await page.waitForTimeout(400);
 check('search offers both scopes', (await page.locator('#search-tabs [data-scope]').count()) === 2);
 

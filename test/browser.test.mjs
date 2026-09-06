@@ -25,6 +25,22 @@ const check = (name, ok, extra = '') => {
   else { fail++; console.log('  FAIL ' + name + (extra ? ' :: ' + extra : '')); }
 };
 
+
+
+
+/**
+ * Navigate the way the app itself does. The room is the only chrome, and it
+ * only exists once there is something in the library, so these tests ask the
+ * router directly rather than depending on a populated room. room.test.mjs is
+ * the one that clicks the actual objects.
+ */
+async function open(page, view, extra = {}) {
+  await page.evaluate(([v, x]) => {
+    document.dispatchEvent(new CustomEvent('goto', { detail: { view: v, ...x } }));
+  }, [view, extra]);
+  await page.waitForTimeout(450);
+}
+
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 3 });
 page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
@@ -77,8 +93,11 @@ check('duration ~6s', Math.abs(lib.first.duration - 6) < 0.2, String(lib.first.d
 
 /* ----------------------------------------------------------------- library */
 console.log('Library views');
-await page.click('[data-nav="library"]');
+await open(page, 'library', { tab: 'albums' });
 await page.waitForTimeout(500);
+// The crate opens on albums; the songs list is one tab across.
+await page.click('#library-tabs [data-tab="songs"]');
+await page.waitForTimeout(400);
 check('songs listed', (await page.locator('[data-view="library"] .row').count()) === 5);
 
 await page.click('#library-tabs [data-tab="albums"]');
@@ -196,7 +215,7 @@ console.log('The import controls');
     document.getElementById('np').hidden = true;
     document.body.style.overflow = '';
   });
-  await page.click('[data-nav="add"]');
+  await open(page, 'add');
   await page.waitForTimeout(500);
 
   // An accept list greys out files iOS has no type for, so there must not be one.
@@ -231,7 +250,7 @@ console.log('Telling the user what is safe to delete');
     document.getElementById('np').hidden = true;
     document.body.style.overflow = '';
   });
-  await page.click('[data-nav="add"]');
+  await open(page, 'add');
   await page.waitForTimeout(500);
   await page.setInputFiles('#file-input', files);
   await page.waitForTimeout(5000);
@@ -304,7 +323,7 @@ check('playlist created with tracks', pls.some((p) => p.name === 'Road Trip' && 
 /* ----------------------------------------------------------------- search */
 console.log('Search');
 await page.evaluate(() => { const np = document.getElementById('np'); np.hidden = true; document.body.style.overflow = ''; });
-await page.click('[data-nav="search"]');
+await open(page, 'search');
 await page.waitForTimeout(400);
 await page.fill('#search-input', 'night');
 await page.waitForTimeout(600);
@@ -317,7 +336,7 @@ check('search finds by title', (await page.locator('[data-view="search"] .row').
 
 /* --------------------------------------------------------------- settings */
 console.log('Settings and equaliser');
-await page.click('[data-nav="settings"]');
+await open(page, 'settings');
 await page.waitForTimeout(500);
 const eqToggle = page.locator('[data-view="settings"] .switch').nth(1);
 await eqToggle.click();

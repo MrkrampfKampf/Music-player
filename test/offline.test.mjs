@@ -57,7 +57,7 @@ const offline = await page.evaluate(() => {
   const root = getComputedStyle(document.documentElement);
   const body = getComputedStyle(document.body);
   return {
-    tabs: document.querySelectorAll('[data-nav]').length,
+    objects: document.querySelectorAll('.room .obj').length,
     home: !!document.querySelector('[data-view="home"]'),
     // These custom properties only exist if the stylesheet itself loaded, so
     // they beat asserting a literal colour that any redesign would break.
@@ -66,7 +66,7 @@ const offline = await page.evaluate(() => {
     icons: !!document.querySelector('#i-play'),
   };
 });
-check('app loads with no network', offline.tabs === 5 && offline.home, JSON.stringify(offline));
+check('app loads with no network', offline.home && offline.icons, JSON.stringify(offline));
 check('stylesheet came from cache',
   offline.token.length > 0 && offline.bg !== 'rgba(0, 0, 0, 0)', JSON.stringify(offline));
 check('icon sprite is present', offline.icons === true);
@@ -75,7 +75,7 @@ check('no errors while offline', errors.length === 0, errors.slice(0, 3).join(' 
 await ctx.setOffline(false);
 await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(2000);
-check('recovers when back online', (await page.locator('[data-nav]').count()) === 5);
+check('recovers when back online', await page.isVisible('[data-view="home"]'));
 
 log('');
 log(pass + ' passed, ' + fail + ' failed');

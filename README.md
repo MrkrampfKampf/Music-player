@@ -32,6 +32,26 @@ Then tap **Add** and choose files, or paste a link.
 
 ## The idea
 
+Home is a room, and the room is the whole app. There are no tabs. You reach
+everything by touching the equipment in front of you:
+
+| Object | What it does |
+|---|---|
+| Speakers | Start and stop the music, and move with it |
+| Turntable | Opens the player |
+| Record crate | Your library |
+| Mixing console | Sound and settings |
+| Tape machine | Add music |
+| Tuner | Find music online |
+| Microphone | Search your library |
+| Headphones | Liked songs |
+| Guitar | Shuffles everything, and the strings ring |
+
+The room is lit by one lamp, dust drifts through it, the deck turns and the
+meters move while something plays. Every object names itself when you touch or
+focus it, all of them are reachable by keyboard, and every screen has the same
+door back to the room in the same corner.
+
 This plays records you own, so it is built out of the objects that implies
 rather than out of cards and sliders.
 
