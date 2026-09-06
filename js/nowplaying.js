@@ -55,28 +55,7 @@ export function initNowPlaying() {
     toast(liked ? 'Added to Liked Songs' : 'Removed from Liked Songs');
   });
 
-  const seek = $('np-seek');
-  bindRangePaint(seek);
-  const beginScrub = () => { scrubbing = true; };
-  const endScrub = () => {
-    if (!scrubbing) return;
-    scrubbing = false;
-    const d = player.duration;
-    if (d) player.seek((seek.value / 1000) * d);
-  };
-  seek.addEventListener('pointerdown', beginScrub);
-  seek.addEventListener('touchstart', beginScrub, { passive: true });
-  seek.addEventListener('input', () => {
-    paintRange(seek);
-    const d = player.duration;
-    if (d) {
-      $('np-elapsed').textContent = formatTime((seek.value / 1000) * d);
-      $('np-remain').textContent = '-' + formatTime(Math.ceil(d - (seek.value / 1000) * d));
-    }
-  });
-  seek.addEventListener('change', endScrub);
-  seek.addEventListener('pointerup', endScrub);
-  seek.addEventListener('touchend', endScrub);
+  attachTonearm();
 
   const vol = $('np-vol');
   bindRangePaint(vol);
@@ -179,7 +158,7 @@ async function onTrackChange() {
 
   // Video plays on its own surface; artwork steps aside.
   const isVideo = track.kind === 'video';
-  $('np-art').hidden = isVideo;
+  $('deck').hidden = isVideo;
   $('np-video').hidden = !isVideo;
   if (isVideo) {
     lyricsVisible = false;
@@ -201,19 +180,18 @@ async function onTrackChange() {
   if (!$('queue-sheet').hidden) renderQueue();
 }
 
+/**
+ * The record tints the light, not the machine.
+ *
+ * Letting the cover repaint the whole app costs it its identity: every screen
+ * becomes whatever colour the last album was. So the brass stays brass, and
+ * the extracted colour only lights the deck.
+ */
 function setAccent(hex) {
-  document.documentElement.style.setProperty('--accent', hex);
-  const rgb = hexToRgb(hex);
-  if (rgb) {
-    document.documentElement.style.setProperty('--accent-soft', 'rgba(' + rgb.join(',') + ',0.16)');
-  }
+  const np = $('np');
+  if (np) np.style.setProperty('--lamp', hex);
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) themeMeta.setAttribute('content', getComputedStyle(document.body).backgroundColor);
-}
-
-function hexToRgb(hex) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
 }
 
 function paintState() {
@@ -222,7 +200,9 @@ function paintState() {
   $('np-play').querySelector('use').setAttribute('href', glyph);
   $('mini-play').querySelector('use').setAttribute('href', glyph);
   $('np-play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  // The platter's rotation and the cue lever's throw both key off this.
   $('np').classList.toggle('paused', !playing);
+  document.body.classList.toggle('playing', playing);
 }
 
 function paintTime() {
@@ -230,15 +210,128 @@ function paintTime() {
   const t = player.currentTime;
 
   if (!scrubbing) {
-    const seek = $('np-seek');
-    seek.value = d ? Math.round((t / d) * 1000) : 0;
-    paintRange(seek);
+    const fraction = d ? Math.min(1, Math.max(0, t / d)) : 0;
+    setArm(fraction);
     $('np-elapsed').textContent = formatTime(t);
     $('np-remain').textContent = d ? '-' + formatTime(Math.ceil(Math.max(0, d - t))) : '--:--';
+    const seek = $('np-seek');
+    if (seek) seek.value = Math.round(fraction * 1000);
   }
 
   $('mini-bar').style.width = (d ? (t / d) * 100 : 0) + '%';
+
+  const side = $('np-side');
+  if (side) side.textContent = d && t > d / 2 ? 'Side B' : 'Side A';
+
   if (lyricsVisible) paintLyrics(t);
+}
+
+/* --------------------------------------------------------------- the arm */
+
+/*
+ * The tonearm sweeps from the outer edge of the record to the run-out groove.
+ * These are the two angles it travels between; everything else is a fraction
+ * of the way across.
+ */
+const ARM_BASE = 134.5;    // the direction the arm is drawn along in the SVG
+const ARM_START = -27.05;  // rotation that puts the stylus on the first groove
+const ARM_END = -4.90;     // ... and in the run-out
+
+/** Move the arm to a fraction of the way through the track. */
+function setArm(fraction) {
+  const angle = ARM_START + (ARM_END - ARM_START) * Math.min(1, Math.max(0, fraction));
+  const arm = $('tonearm');
+  if (!arm) return;
+  arm.style.setProperty('--arm', angle.toFixed(2) + 'deg');
+  arm.setAttribute('aria-valuenow', Math.round(fraction * 100));
+}
+
+/**
+ * Dragging the arm is the seek control.
+ *
+ * The angle is taken from where your finger is relative to the arm's pivot,
+ * so the arm tracks the finger rather than following some invisible slider.
+ */
+function attachTonearm() {
+  const arm = $('tonearm');
+  const deck = $('deck');
+  if (!arm || !deck) return;
+
+  let pivot = null;
+
+  /** Where the finger is, as the arm rotation that would point at it. */
+  const rotationAt = (event) => {
+    const dx = event.clientX - pivot.x;
+    const dy = event.clientY - pivot.y;
+    return (Math.atan2(dy, dx) * 180) / Math.PI - ARM_BASE;
+  };
+
+  const fractionFor = (rotation) => {
+    const swept = (rotation - ARM_START) / (ARM_END - ARM_START);
+    return Math.min(1, Math.max(0, swept));
+  };
+
+  const preview = (fraction) => {
+    setArm(fraction);
+    const d = player.duration;
+    if (!d) return;
+    $('np-elapsed').textContent = formatTime(fraction * d);
+    $('np-remain').textContent = '-' + formatTime(Math.ceil(d * (1 - fraction)));
+  };
+
+  const onDown = (event) => {
+    if (!player.current) return;
+    // The deck's own box already includes its offset, so the pivot is simply
+    // the fraction of it that the stylesheet places the pivot at.
+    const deckBox = deck.getBoundingClientRect();
+    pivot = {
+      x: deckBox.left + deckBox.width * 1.00,
+      y: deckBox.top + deckBox.height * 0.17,
+    };
+    scrubbing = true;
+    arm.classList.add('dragging');
+    deck.classList.add('touched');
+    arm.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  const onMove = (event) => {
+    if (!scrubbing) return;
+    preview(fractionFor(rotationAt(event)));
+  };
+
+  const onUp = (event) => {
+    if (!scrubbing) return;
+    const fraction = fractionFor(rotationAt(event));
+    scrubbing = false;
+    arm.classList.remove('dragging');
+    setTimeout(() => deck.classList.remove('touched'), 900);
+    const d = player.duration;
+    if (d) player.seek(fraction * d);
+    else setArm(0);
+  };
+
+  arm.addEventListener('pointerdown', onDown);
+  arm.addEventListener('pointermove', onMove);
+  arm.addEventListener('pointerup', onUp);
+  arm.addEventListener('pointercancel', onUp);
+
+  // Keyboard and assistive technology get the same control.
+  arm.addEventListener('keydown', (event) => {
+    const d = player.duration;
+    if (!d) return;
+    const step = event.shiftKey ? 30 : 5;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') { player.seekBy(step); event.preventDefault(); }
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') { player.seekBy(-step); event.preventDefault(); }
+    else if (event.key === 'Home') { player.seek(0); event.preventDefault(); }
+  });
+
+  // Tapping the record itself starts and stops it, the way you would stop a
+  // platter with your hand.
+  deck.addEventListener('click', (event) => {
+    if (event.target.closest('#tonearm')) return;
+    player.toggle();
+  });
 }
 
 function paintLike() {
@@ -274,7 +367,11 @@ function paintModes() {
     badge.remove();
   }
 
-  $('np-speed-label').textContent = formatRate(player.playbackRate);
+  // A deck shows a speed, not a multiplier: 33 is normal, anything else is
+  // off-spec and says so.
+  const pip = $('np-speed-label');
+  pip.textContent = player.playbackRate === 1 ? '33' : formatRate(player.playbackRate);
+  pip.classList.toggle('on', player.playbackRate !== 1);
   $('np-speed-btn').classList.toggle('on', player.playbackRate !== 1);
 
   const vol = $('np-vol');
@@ -298,7 +395,8 @@ function toggleLyrics() {
   if (player.isVideo) { toast('Lyrics are for audio tracks.'); return; }
   lyricsVisible = !lyricsVisible;
   $('np-lyrics').hidden = !lyricsVisible;
-  $('np-art').style.opacity = lyricsVisible ? '0' : '1';
+  $('deck').style.opacity = lyricsVisible ? '0' : '1';
+  $('deck').style.pointerEvents = lyricsVisible ? 'none' : '';
   $('np-lyrics-btn').classList.toggle('on', lyricsVisible);
   if (lyricsVisible) renderLyrics();
 }

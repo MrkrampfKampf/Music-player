@@ -30,6 +30,28 @@ Then tap **Add** and choose files, or paste a link.
 
 ---
 
+## The idea
+
+This plays records you own, so it is built out of the objects that implies
+rather than out of cards and sliders.
+
+The **Now Playing** screen is a deck. The platter turns while the music runs
+and stops when you pause, the album art is the label at its centre, and the
+tonearm's angle across the grooves is your position in the track. You drag the
+arm to move through a song. There is no progress bar on that screen, because
+the object already tells you everything one would.
+
+A **track listing** is set like the back of a sleeve: numbered, with dot
+leaders running out to the time. The **equaliser** is a mixing desk whose
+fader caps you read as a curve rather than as ten numbers. **Settings** is the
+faceplate of an amplifier, with switches that throw and labels screen-printed
+in the metal. The **tab bar** is the row of buttons along the bottom of a
+hi-fi, with a small lamp above the one that is engaged.
+
+Square corners, light from above, and one fixed brass accent throughout. The
+record on the platter tints the lamp over the deck, but it never repaints the
+rest of the app: the machine keeps its own colour.
+
 ## What it does
 
 **Your files, untouched.** Import MP3, M4A, AAC, WAV, FLAC, AIFF, ALAC, Ogg and
@@ -51,7 +73,7 @@ above. No filenames-as-titles unless a file genuinely has no tags.
 |---|---|
 | Library | Songs, albums, artists, genres, videos, playlists |
 | Liked Songs | Heart anything; converted links land here automatically |
-| Now Playing | Full screen, scrubber, drag down to dismiss, colour taken from the album art |
+| Now Playing | A turntable. The platter turns while it plays and the tonearm's angle is your position in the track. Drag the arm to move. |
 | Up Next | See the queue, reorder it by dragging, play next, add to queue |
 | Lyrics | Synced `.lrc` that follows the song, or plain text |
 | Search | Instant, across titles, artists, albums and genres |

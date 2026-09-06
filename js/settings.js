@@ -197,11 +197,21 @@ function audioGroup(host) {
 }
 
 function eqSliders(host) {
-  const wrap = el('div', { class: 'setting', style: { display: 'block' } });
+  const wrap = el('div', { class: 'eq-desk' });
   const bands = el('div', { class: 'eq-bands' });
+
+  // The fader cap is positioned from the value, so the desk reads at a glance
+  // the way a real one does: the shape of the curve is the setting.
+  const capOffset = (gain) => {
+    const travel = 118 - 15;                  // slot height minus cap height
+    return (travel * (12 - gain)) / 24;
+  };
 
   EQ_BANDS.forEach((freq, index) => {
     const value = el('span', { class: 'val', text: fmtGain(settings.eqGains[index]) });
+    const cap = el('span', { class: 'cap' });
+    cap.style.setProperty('--capY', capOffset(settings.eqGains[index]) + 'px');
+
     const slider = el('input', {
       type: 'range',
       min: '-12',
@@ -210,20 +220,29 @@ function eqSliders(host) {
       value: String(settings.eqGains[index]),
       'aria-label': freqLabel(freq) + ' band',
     });
+
     slider.addEventListener('input', () => {
-      settings.eqGains[index] = Number(slider.value);
+      const gain = Number(slider.value);
+      settings.eqGains[index] = gain;
       settings.eqPreset = 'Custom';
-      value.textContent = fmtGain(settings.eqGains[index]);
+      value.textContent = fmtGain(gain);
+      cap.style.setProperty('--capY', capOffset(gain) + 'px');
       player.setEqGains(settings.eqGains);
     });
     slider.addEventListener('change', saveSettings);
 
-    bands.append(el('div', { class: 'eq-band' }, value, slider, el('label', { text: freqLabel(freq) })));
+    bands.append(el('div', { class: 'eq-band' },
+      value,
+      el('span', { class: 'slot' }, slider, cap),
+      el('label', { text: freqLabel(freq) })));
   });
 
   wrap.append(bands);
 
-  const preamp = el('input', { type: 'range', min: '-12', max: '12', step: '0.5', value: String(settings.preamp), 'aria-label': 'Preamp' });
+  const preamp = el('input', {
+    type: 'range', min: '-12', max: '12', step: '0.5',
+    value: String(settings.preamp), 'aria-label': 'Preamp',
+  });
   const preampValue = el('span', { class: 'setting-value', text: fmtGain(settings.preamp) + ' dB' });
   bindRangePaint(preamp);
   preamp.addEventListener('input', () => {
@@ -234,13 +253,12 @@ function eqSliders(host) {
   });
   preamp.addEventListener('change', saveSettings);
 
-  wrap.append(el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' } },
-    el('b', { text: 'Preamp', style: { fontSize: '14px', flex: 'none' } }), preamp, preampValue));
+  wrap.append(el('div', { class: 'desk-row' }, el('b', { text: 'Gain' }), preamp, preampValue));
 
   wrap.append(el('button', {
     class: 'btn secondary wide',
-    text: 'Reset to flat',
-    style: { marginTop: '12px' },
+    text: 'Zero the desk',
+    style: { marginTop: '10px' },
     onclick: async () => {
       settings.eqPreset = 'Flat';
       settings.eqGains = EQ_PRESETS.Flat.slice();

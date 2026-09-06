@@ -49,14 +49,22 @@ await ctx.setOffline(true);
 await page.reload({ waitUntil: 'domcontentloaded', timeout: 25000 });
 await page.waitForTimeout(5000);
 
-const offline = await page.evaluate(() => ({
-  tabs: document.querySelectorAll('[data-nav]').length,
-  home: !!document.querySelector('[data-view="home"]'),
-  bg: getComputedStyle(document.body).backgroundColor,
-  icons: !!document.querySelector('#i-play'),
-}));
+const offline = await page.evaluate(() => {
+  const root = getComputedStyle(document.documentElement);
+  const body = getComputedStyle(document.body);
+  return {
+    tabs: document.querySelectorAll('[data-nav]').length,
+    home: !!document.querySelector('[data-view="home"]'),
+    // These custom properties only exist if the stylesheet itself loaded, so
+    // they beat asserting a literal colour that any redesign would break.
+    token: root.getPropertyValue('--bg').trim(),
+    bg: body.backgroundColor,
+    icons: !!document.querySelector('#i-play'),
+  };
+});
 check('app loads with no network', offline.tabs === 5 && offline.home, JSON.stringify(offline));
-check('stylesheet came from cache', offline.bg === 'rgb(8, 8, 11)', offline.bg);
+check('stylesheet came from cache',
+  offline.token.length > 0 && offline.bg !== 'rgba(0, 0, 0, 0)', JSON.stringify(offline));
 check('icon sprite is present', offline.icons === true);
 check('no errors while offline', errors.length === 0, errors.slice(0, 3).join(' | '));
 

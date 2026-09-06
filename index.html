@@ -132,8 +132,67 @@
     <div class="np-inner">
       <button class="np-grabber" id="np-close" aria-label="Close the player"></button>
 
+      <!-- The deck. The record turning is the play state, the tonearm's angle
+           is the position in the track, and dragging the arm seeks. -->
       <div class="np-stage" id="np-stage">
-        <div class="np-art" id="np-art"><img id="np-img" alt=""></div>
+        <div class="deck" id="deck">
+          <div class="platter">
+            <div class="platter-spin">
+              <div class="label" id="np-art"><img id="np-img" alt=""></div>
+            </div>
+            <div class="strobe" aria-hidden="true"></div>
+            <div class="spindle" aria-hidden="true"></div>
+          </div>
+
+          <!-- Pivot at 90%/16% of this box, which the CSS places just off the
+               platter's upper right. The arm is drawn along 134.5 degrees and
+               is 94.9 units long, so the stylus lands exactly on the groove
+               band when the box is rotated between the two angles in
+               nowplaying.js. -->
+          <div class="tonearm" id="tonearm" role="slider" tabindex="0"
+               aria-label="Position in the track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <!-- counterweight, behind the pivot -->
+              <rect x="110" y="2" width="16" height="12" rx="1" fill="#33291e" stroke="#0a0806" stroke-width="0.7"/>
+              <rect x="112" y="4.5" width="12" height="2" fill="#0a0806" opacity="0.5"/>
+
+              <!-- the arm, a dark core with a brushed highlight over it -->
+              <path d="M104.4 24 L41.5 86.9" stroke="#0a0806" stroke-width="7" stroke-linecap="round"/>
+              <path d="M104.4 24 L41.5 86.9" stroke="url(#armG)" stroke-width="4.4" stroke-linecap="round"/>
+              <path d="M104.4 24 L41.5 86.9" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity="0.22"/>
+
+              <!-- pivot housing -->
+              <circle cx="108" cy="19.2" r="12" fill="#2b241c" stroke="#0a0806" stroke-width="1"/>
+              <circle cx="108" cy="19.2" r="6.5" fill="url(#brassG)"/>
+              <circle cx="108" cy="19.2" r="2" fill="#0a0806" opacity="0.45"/>
+
+              <!-- headshell, square to the arm -->
+              <g transform="rotate(134.5 41.5 86.9)">
+                <rect x="34" y="80" width="22" height="14" rx="1.5" fill="#241e18" stroke="#0a0806" stroke-width="0.8"/>
+                <rect x="36.5" y="82.5" width="17" height="3" fill="#0a0806" opacity="0.55"/>
+              </g>
+
+              <!-- the stylus, touching the groove -->
+              <circle cx="41.5" cy="86.9" r="2.6" fill="#d4a04a"/>
+              <circle cx="41.5" cy="86.9" r="1" fill="#fff" opacity="0.7"/>
+
+              <defs>
+                <linearGradient id="armG" x1="1" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#d8cdb4"/>
+                  <stop offset="0.45" stop-color="#8f846c"/>
+                  <stop offset="1" stop-color="#524839"/>
+                </linearGradient>
+                <linearGradient id="brassG" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#f4dfae"/>
+                  <stop offset="1" stop-color="#8a6a22"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+
+          <span class="arm-hint silk">Drag the arm to move</span>
+        </div>
+
         <video id="np-video" playsinline hidden></video>
         <div class="np-lyrics" id="np-lyrics" hidden></div>
       </div>
@@ -148,10 +207,14 @@
         </button>
       </div>
 
-      <div class="np-scrub">
-        <input id="np-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
-        <div class="np-times"><span id="np-elapsed">0:00</span><span id="np-remain">-0:00</span></div>
+      <!-- The deck counter. No bar: the arm already shows the position. -->
+      <div class="np-counter">
+        <span class="num big" id="np-elapsed">0:00</span>
+        <span class="silk" id="np-side">Side A</span>
+        <span class="num" id="np-remain">-0:00</span>
       </div>
+      <input id="np-seek" type="range" min="0" max="1000" value="0" step="1"
+             aria-label="Seek" hidden>
 
       <div class="np-controls">
         <button class="icon-btn" id="np-shuffle" aria-label="Shuffle">
@@ -160,9 +223,16 @@
         <button class="icon-btn big" id="np-prev" aria-label="Previous track">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-prev"/></svg>
         </button>
-        <button class="play-btn" id="np-play" aria-label="Play">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>
+
+        <!-- Cue lever: throw it across to drop the stylus. -->
+        <button class="cue" id="np-play" aria-label="Play">
+          <span class="cue-track"></span>
+          <span class="cue-knob">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-play"/></svg>
+          </span>
+          <span class="cue-label"><span>CUE</span><span>PLAY</span></span>
         </button>
+
         <button class="icon-btn big" id="np-next" aria-label="Next track">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-next"/></svg>
         </button>
@@ -172,23 +242,24 @@
       </div>
 
       <div class="np-volume" id="np-volume">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-volume-low"/></svg>
         <input id="np-vol" type="range" min="0" max="100" value="100" aria-label="Volume">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-volume-high"/></svg>
       </div>
 
       <div class="np-tools">
         <button class="tool" id="np-lyrics-btn" aria-label="Lyrics">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lyrics"/></svg><span>Lyrics</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lyrics"/></svg><span>Words</span>
         </button>
         <button class="tool" id="np-airplay-btn" aria-label="AirPlay">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-airplay"/></svg><span>AirPlay</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-airplay"/></svg><span>Out</span>
         </button>
         <button class="tool" id="np-speed-btn" aria-label="Playback speed">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-speed"/></svg><span id="np-speed-label">1x</span>
+          <span class="speeds">
+            <span class="speed-pip" id="np-speed-label">33</span>
+          </span>
+          <span>Speed</span>
         </button>
         <button class="tool" id="np-queue-btn" aria-label="Up next">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-queue"/></svg><span>Queue</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-queue"/></svg><span>Stack</span>
         </button>
       </div>
     </div>

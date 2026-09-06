@@ -34,11 +34,7 @@ export function trackRow(track, context, options = {}) {
   if (player.current && player.current.id === track.id) row.classList.add('playing');
 
   if (showNumber) {
-    row.append(el('span', {
-      class: 'row-time',
-      style: { width: '22px', textAlign: 'center' },
-      text: track.trackNo || index + 1,
-    }));
+    row.append(el('span', { class: 'row-index', text: String(track.trackNo || index + 1).padStart(2, '0') }));
   } else if (showArt) {
     row.append(artNode(track.artworkKey));
   }
@@ -56,7 +52,9 @@ export function trackRow(track, context, options = {}) {
   if (sub.childNodes.length) text.append(sub);
   row.append(text);
 
-  row.append(el('span', { class: 'row-time', text: formatTime(track.duration) }));
+  // Dot leaders run out to the time, the way a printed track listing does.
+  row.append(el('span', { class: 'leader', 'aria-hidden': 'true' }));
+  row.append(el('span', { class: 'row-time num', text: formatTime(track.duration) }));
 
   const more = el('span', { class: 'icon-btn row-more', role: 'button', tabindex: '0', 'aria-label': 'More options' }, icon('more'));
   more.addEventListener('click', (event) => {
@@ -366,7 +364,7 @@ export function addToPlaylistSheet(trackIds) {
 
 function shelf(title, cards, onSeeAll) {
   if (!cards.length) return null;
-  const head = el('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' } },
+  const head = el('div', { class: 'shelf-head' },
     el('h2', { class: 'section-title', text: title }),
     onSeeAll ? el('button', { class: 'text-btn', text: 'See All', onclick: onSeeAll }) : null);
   return el('section', { class: 'shelf' }, head,
