@@ -1,0 +1,1049 @@
+/* =========================================================================
+   THE ROOM
+
+   Not a picture of a studio: a room built out of real quads in a perspective
+   projection. Walls, floor and every object are planes placed in 3D, so they
+   occlude each other, catch the lamp by their own angle, and move against one
+   another as the camera shifts. The lighting model is deliberately simple and
+   consistent: one warm lamp over the desk, a cold spill from the window, and
+   ambient occlusion wherever two surfaces meet.
+
+   Everything here is expressed as custom properties so an object only has to
+   say where it is and which way it faces.
+   ========================================================================= */
+
+.room {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 300px;
+  overflow: hidden;
+  background: #05040a;
+  touch-action: manipulation;
+  --px: 0;             /* parallax, -1..1, from pointer or device tilt */
+  --py: 0;
+  --cam-x: 0px;        /* the camera, moved when approaching an object */
+  --cam-y: 0px;
+  --cam-z: 0px;
+  --cam-s: 1;
+  --lamp: 255, 214, 150;
+  --cool: 150, 186, 214;
+}
+
+/* The lens. 1100px reads like standing a couple of metres back: enough
+   convergence to feel like a room, not so much that it fisheyes. */
+.stage {
+  position: absolute;
+  inset: 0;
+  perspective: 1100px;
+  perspective-origin: 50% 41%;
+  overflow: hidden;
+}
+
+.world {
+  position: absolute;
+  left: 50%;
+  top: 41%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  /* The camera is written from script rather than composed here out of custom
+     properties: a transform built from unregistered variables does not always
+     re-evaluate when they change, and the walk across the room is the one
+     transition that must never be dropped. */
+  transform-origin: 50% 50%;
+  transition: transform 0.62s cubic-bezier(0.33, 0.9, 0.2, 1);
+  will-change: transform;
+}
+.world.settling { transition-duration: 0.72s; }
+
+/* ---------------------------------------------------------------- surfaces */
+
+/* Every plane in the room is one of these. It is placed by its centre, so a
+   quad only needs a size, a position and a rotation. */
+.q {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  margin-left: calc(var(--w) / -2);
+  margin-top: calc(var(--h) / -2);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transform:
+    translate3d(var(--x, 0px), var(--y, 0px), var(--z, 0px))
+    rotateY(var(--ry, 0deg))
+    rotateX(var(--rx, 0deg))
+    rotateZ(var(--rz, 0deg));
+}
+
+/* How much of the lamp a face receives. Set per face; the light itself is a
+   warm wash, and what is left of the surface falls to the room's ambient. */
+.q::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 140% at var(--lx, 50%) var(--ly, 0%),
+      rgba(var(--lamp), var(--lit, 0)) 0%,
+      rgba(var(--lamp), calc(var(--lit, 0) * 0.28)) 42%,
+      rgba(0, 0, 0, 0) 78%);
+  mix-blend-mode: screen;
+}
+/* Ambient occlusion: the dark that gathers where planes meet. */
+.q::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: var(--ao, inset 0 0 22px rgba(0, 0, 0, 0.5));
+}
+.q.flat::before, .q.flat::after { content: none; }
+
+/* Grain lives on the surfaces, not over the whole screen, so it sits *in* the
+   room rather than on the glass. */
+.grainy {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  background-blend-mode: overlay;
+}
+
+/* --------------------------------------------------------------- materials */
+
+.m-plaster {
+  background:
+    linear-gradient(180deg, #23201f 0%, #191615 55%, #100e0d 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='4'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  background-blend-mode: normal, overlay;
+}
+.m-boards {
+  background:
+    radial-gradient(60% 34% at 50% 62%, rgba(255, 214, 150, 0.07), rgba(0, 0, 0, 0) 68%),
+    repeating-linear-gradient(90deg,
+      rgba(0, 0, 0, 0.42) 0 1px,
+      rgba(0, 0, 0, 0) 1px 76px,
+      rgba(255, 214, 150, 0.05) 76px 77px),
+    repeating-linear-gradient(0deg,
+      rgba(0, 0, 0, 0.3) 0 2px,
+      rgba(0, 0, 0, 0) 2px 240px),
+    linear-gradient(180deg, #2c2118 0%, #1a130e 60%, #0d0a08 100%);
+}
+.m-walnut {
+  background:
+    repeating-linear-gradient(96deg,
+      rgba(0, 0, 0, 0.22) 0 2px,
+      rgba(0, 0, 0, 0) 2px 7px,
+      rgba(255, 210, 150, 0.05) 7px 8px),
+    linear-gradient(104deg, #2f2015 0%, #5c3d22 34%, #3b2716 62%, #56381f 84%, #241810 100%);
+}
+.m-alloy {
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255, 248, 228, 0.05) 0 1px,
+      rgba(0, 0, 0, 0.05) 1px 2px),
+    linear-gradient(168deg, #b9ae95 0%, #7d7461 26%, #4d473c 58%, #8e8571 82%, #3c372e 100%);
+}
+.m-steel {
+  background: linear-gradient(150deg, #d8cdb4 0%, #8b8270 34%, #454036 66%, #a49a84 100%);
+}
+.m-brass {
+  background: linear-gradient(150deg, #ffeec2 0%, #d4a04a 30%, #8a6320 66%, #e0b667 100%);
+}
+.m-black {
+  background: linear-gradient(170deg, #211d1a 0%, #131110 46%, #0a0908 100%);
+}
+.m-cloth {
+  background:
+    radial-gradient(circle at 0.6px 0.6px, rgba(255, 232, 196, 0.10) 0.35px, rgba(0, 0, 0, 0) 0.6px) 0 0 / 3px 3px,
+    radial-gradient(circle at 1.2px 1.2px, rgba(0, 0, 0, 0.75) 0.5px, rgba(0, 0, 0, 0) 1px) 0 0 / 3px 3px,
+    linear-gradient(180deg, #2a231c, #16110d);
+}
+.m-felt { background: linear-gradient(160deg, #4b2f21, #2c1a12 70%, #1c110b); }
+
+/* ----------------------------------------------------------------- objects */
+
+/* An object is a group of quads that moves and lights as one thing. */
+.obj, .grp {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform:
+    translate3d(var(--x, 0px), var(--y, 0px), var(--z, 0px))
+    rotateY(var(--ry, 0deg))
+    rotateX(var(--rx, 0deg))
+    rotateZ(var(--rz, 0deg));
+  transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.4, 1), filter 0.25s;
+}
+/* A touchable object is also a transparent plane at its own position, so it
+   can be reached by a finger and by the keyboard without the finger having to
+   find a 4px knob. It sits behind the object's own faces, which is why the
+   faders and the tonearm still win their own touches. */
+.obj.live {
+  width: var(--hw, 220px);
+  height: var(--hh, 220px);
+  margin-left: calc(var(--hw, 220px) / -2);
+  margin-top: calc(var(--hh, 220px) / -2);
+  background: rgba(0, 0, 0, 0);
+  cursor: pointer;
+}
+.obj.live > .q,
+.obj.live > .grp,
+.obj.live > .shadow { left: 50%; top: 50%; }
+/* Every face in the room is scenery. Only an object's own plane takes a
+   touch, and only its working controls take one of their own. */
+.q, .grp, .shadow, .beam, .air { pointer-events: none; }
+.obj.live [data-band],
+.obj.live [data-knob],
+.obj.live [data-arm],
+.obj.live [data-deck-key] { pointer-events: auto; }
+.obj.live:focus { outline: none; }
+
+/* Touching an object lifts it into the light a little; it does not glow. */
+.obj.live.hot { filter: brightness(1.16) saturate(1.05); }
+.obj.live.press { transform:
+    translate3d(var(--x, 0px), calc(var(--y, 0px) + 1.5px), calc(var(--z, 0px) - 3px))
+    rotateY(var(--ry, 0deg)) rotateX(var(--rx, 0deg)) rotateZ(var(--rz, 0deg)); }
+.obj.live.picked { filter: brightness(1.24); }
+
+/* The keyboard ring has to live in the room too, so it is a rim of light
+   around the object rather than a browser outline. */
+.obj.live:focus-visible { filter: brightness(1.3) drop-shadow(0 0 14px rgba(212, 160, 74, 0.55)); }
+
+/* Contact shadows are quads on the floor, blurred and squashed. */
+.shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  margin-left: calc(var(--w) / -2);
+  margin-top: calc(var(--h) / -2);
+  transform: translate3d(var(--x, 0px), var(--y, 0px), var(--z, 0px)) rotateX(90deg);
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0));
+  filter: blur(var(--soft, 10px));
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- the light */
+
+/* The lamp: a real shade with a real cone under it. */
+.beam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  margin-left: calc(var(--w) / -2);
+  margin-top: calc(var(--h) / -2);
+  transform: translate3d(var(--x, 0px), var(--y, 0px), var(--z, 0px));
+  background:
+    radial-gradient(46% 42% at 50% 6%,
+      rgba(var(--lamp), 0.26) 0%,
+      rgba(var(--lamp), 0.10) 26%,
+      rgba(var(--lamp), 0.02) 54%,
+      rgba(0, 0, 0, 0) 74%);
+  filter: blur(24px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: lamp-breathe 9s ease-in-out infinite;
+}
+@keyframes lamp-breathe {
+  0%, 100% { opacity: 0.94; }
+  50% { opacity: 1; }
+}
+
+/* Anything that emits: LEDs, dials, the tuner's scale. */
+.glow {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(var(--c, 212, 160, 74), 0.95), rgba(var(--c, 212, 160, 74), 0));
+  filter: blur(2px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.led {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgb(var(--c, 212, 160, 74));
+  box-shadow: 0 0 7px 2px rgba(var(--c, 212, 160, 74), 0.75);
+  transition: opacity 0.25s;
+}
+
+/* ------------------------------------------------------------- atmosphere */
+
+/* Air. Dust in the beam, then the falloff at the edges of vision. */
+.air {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.air .dust {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(255, 233, 189, 0.55);
+  filter: blur(0.4px);
+  animation: drift linear infinite;
+}
+@keyframes drift {
+  from { transform: translate3d(0, 0, 0); opacity: 0; }
+  12%  { opacity: 0.7; }
+  88%  { opacity: 0.5; }
+  to   { transform: translate3d(var(--dx, 18px), var(--dy, -70px), 0); opacity: 0; }
+}
+.air .vig {
+  position: absolute;
+  inset: -2px;
+  background:
+    radial-gradient(94% 62% at 50% 42%, rgba(0, 0, 0, 0) 44%, rgba(0, 0, 0, 0.86) 100%);
+}
+/* The lens is not perfect: the corners fall off in focus as well as light. */
+.air .bloom {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(42% 30% at 50% 26%, rgba(255, 214, 150, 0.07), rgba(0, 0, 0, 0) 70%);
+  mix-blend-mode: screen;
+}
+
+/* ----------------------------------------------------------------- labels */
+
+/* The only text in the room. It appears where the object is, as if engraved
+   on the air in front of it, and only while a finger is on something. */
+.room-tip {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%) translateY(6px);
+  padding: 7px 14px;
+  background: rgba(10, 8, 6, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(212, 160, 74, 0.28);
+  color: #e9dcc0;
+  font-family: var(--sans);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+  z-index: 6;
+}
+.room-tip.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* The way out, for anyone who does not want to hunt: a light switch by the
+   door. It is part of the room, and it is always in the same place. */
+.room-switch {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 7;
+  width: 34px;
+  height: 50px;
+  padding: 0;
+  border-radius: 3px;
+  background: linear-gradient(160deg, #d9cfba 0%, #a2977f 40%, #6d6455 100%);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.7),
+    0 6px 14px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 250, 235, 0.7);
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.room-switch::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 8px;
+  height: 22px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f2e9d4, #b9ae95 62%, #7f7663);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 -3px 5px rgba(0, 0, 0, 0.25);
+  transition: transform 0.16s var(--mech);
+}
+.room-switch:hover, .room-switch:focus-visible { opacity: 0.9; }
+.room-switch[aria-expanded="true"] { opacity: 1; }
+.room-switch[aria-expanded="true"]::after { transform: translateY(12px); }
+
+.room-menu {
+  position: absolute;
+  right: 14px;
+  top: 72px;
+  z-index: 7;
+  display: grid;
+  gap: 1px;
+  min-width: 148px;
+  padding: 1px;
+  background: rgba(9, 7, 6, 0.86);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  border: 1px solid rgba(212, 160, 74, 0.22);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  transform-origin: 100% 0;
+  animation: switch-on 0.18s var(--ease);
+}
+@keyframes switch-on {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.room-menu[hidden] { display: none; }
+.room-menu button {
+  padding: 11px 14px;
+  text-align: left;
+  color: #cdc0a5;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: rgba(255, 240, 214, 0.03);
+}
+.room-menu button:hover, .room-menu button:focus-visible { color: #f3e7cc; background: rgba(212, 160, 74, 0.14); }
+
+/* --------------------------------------------------------------- movement */
+
+/* The room keeps moving when nothing is playing, just less. */
+.spin { animation: spin var(--rpm, 1.8s) linear infinite; animation-play-state: paused; }
+.room.playing .spin { animation-play-state: running; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.reel-l { animation: spin 2.4s linear infinite; animation-play-state: paused; }
+.reel-r { animation: spin 3.6s linear infinite reverse; animation-play-state: paused; }
+.room.playing .reel-l, .room.playing .reel-r { animation-play-state: running; }
+
+@media (prefers-reduced-motion: reduce) {
+  .world { transition: none; }
+  .beam, .air .dust, .spin, .reel-l, .reel-r { animation: none; }
+}
+
+/* =========================================================================
+   WHAT IS ON THE OBJECTS
+
+   Each block below draws the working parts of one piece of equipment. They
+   live on the faces of the boxes above, in that face's own pixel space, so a
+   knob drawn at 40px is 40px on that panel and turns with it in 3D.
+   ========================================================================= */
+
+/* ------------------------------------------------------------ the deck */
+
+.deck-well {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 200px; height: 200px;
+  margin: -100px 0 0 -104px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #0a0908 96%, rgba(0,0,0,0));
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 246, 226, 0.09);
+}
+.platter {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 186px; height: 186px;
+  margin: -93px 0 0 -97px;
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+}
+.disc {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle at 50% 50%,
+      rgba(255, 244, 220, 0.045) 0 1px, rgba(0, 0, 0, 0.5) 1px 2.4px),
+    radial-gradient(circle at 36% 28%, #262220 0%, #100e0c 44%, #050404 100%);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
+}
+.disc::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(148deg,
+    rgba(255, 243, 214, 0.22) 0%, rgba(255, 243, 214, 0.02) 18%,
+    rgba(255, 243, 214, 0) 44%, rgba(255, 214, 150, 0.06) 66%,
+    rgba(255, 243, 214, 0.14) 100%);
+}
+.disc-label {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 70px; height: 70px;
+  margin: -35px 0 0 -35px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0 8px;
+  overflow: hidden;
+  background: linear-gradient(150deg, #e35e43, #c0442f 52%, #82271a);
+  color: rgba(255, 240, 214, 0.85);
+  font-family: var(--sans);
+  font-size: 6px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.3;
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 170, 0.25);
+}
+.spindle {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 7px; height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: linear-gradient(150deg, #f2e9d4, #8b8270 60%, #3c362d);
+}
+.arm-post {
+  position: absolute;
+  right: 16px; top: 22px;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #cfc2a6, #6f6656 56%, #2a251e);
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 250, 235, 0.4);
+}
+.arm-post::after {
+  content: "";
+  position: absolute;
+  left: 9px; top: 9px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(150deg, #ffeec2, #d4a04a 34%, #87611f);
+}
+.arm {
+  position: absolute;
+  right: 25px; top: 31px;
+  width: 150px; height: 16px;
+  transform-origin: calc(100% - 8px) 50%;
+  transform: rotate(var(--a, -27deg));
+  cursor: grab;
+  touch-action: none;
+}
+.arm:active { cursor: grabbing; }
+.arm-tube {
+  position: absolute;
+  left: 12px; right: 8px; top: 6px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #eadfc9, #8c8371 46%, #3c362d);
+  box-shadow: 0 5px 7px rgba(0, 0, 0, 0.55);
+}
+.arm-head {
+  position: absolute;
+  left: 0; top: 1px;
+  width: 22px; height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(160deg, #cbbfa6 0%, #7d7461 55%, #45403a 100%);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.6);
+}
+.arm-head::after {
+  content: "";
+  position: absolute;
+  left: 3px; bottom: -5px;
+  width: 12px; height: 6px;
+  background: #c0442f;
+  clip-path: polygon(0 0, 100% 0, 76% 100%, 22% 100%);
+}
+.deck-key {
+  position: absolute;
+  bottom: 12px;
+  width: 40px; height: 20px;
+  border-radius: 2px;
+  color: rgba(236, 226, 205, 0.5);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  background: linear-gradient(180deg, #37302a, #201a16);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 246, 226, 0.14);
+  transition: transform 0.08s var(--mech), box-shadow 0.08s, color 0.2s;
+}
+.deck-key[data-deck-key="33"] { left: 12px; }
+.deck-key[data-deck-key="45"] { left: 58px; }
+.deck-key:active { transform: translateY(2px); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8); }
+.deck-key.on { color: #f0e2c4; box-shadow: 0 2px 0 rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,246,226,0.2), 0 0 8px rgba(212,160,74,0.35); }
+.deck-plate {
+  position: absolute;
+  right: 12px; bottom: 12px;
+  padding: 3px 7px;
+  color: #d4a04a;
+  font-family: var(--sans);
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #322b24, #1a1512);
+  box-shadow: inset 0 1px 0 rgba(255, 246, 226, 0.18);
+}
+
+/* --------------------------------------------------------- the console */
+
+.vu {
+  position: absolute;
+  top: 12px;
+  width: 82px; height: 34px;
+  background: linear-gradient(180deg, #1d1708 0%, #100d08 100%);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 246, 226, 0.1);
+  overflow: hidden;
+}
+.vu { left: 16px; }
+.vu.vu-r { left: 106px; }
+.vu::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(158deg, rgba(255, 246, 226, 0.14) 0 24%, rgba(255, 246, 226, 0) 52%);
+}
+.vu span {
+  position: absolute;
+  right: 5px; bottom: 3px;
+  color: rgba(212, 160, 74, 0.6);
+  font-family: var(--mono);
+  font-size: 7px;
+}
+.needle {
+  position: absolute;
+  left: 50%; bottom: 3px;
+  width: 1.4px; height: 26px;
+  margin-left: -0.7px;
+  background: linear-gradient(180deg, #ffd79a, #d4a04a);
+  transform-origin: 50% 100%;
+  box-shadow: 0 0 5px rgba(212, 160, 74, 0.7);
+}
+.strip {
+  position: absolute;
+  left: 14px; right: 14px; bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+}
+.fader {
+  position: relative;
+  width: 26px; height: 96px;
+  touch-action: none;
+  cursor: ns-resize;
+}
+.fader .slot {
+  position: absolute;
+  left: 50%; top: 6px; bottom: 16px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #050404;
+  box-shadow: inset 0 0 3px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 246, 226, 0.12);
+}
+.fader .cap {
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  width: 24px; height: 13px;
+  margin-top: -6.5px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f2e9d4 0%, #b9ae95 40%, #6d6455 100%);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.7), inset 0 -3px 4px rgba(0, 0, 0, 0.28);
+  transform: translateY(var(--t, 0px));
+  transition: transform 0.05s linear;
+}
+.fader .cap::after {
+  content: "";
+  position: absolute;
+  left: 2px; right: 2px; top: 5.4px;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.fader span {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  text-align: center;
+  color: rgba(236, 226, 205, 0.42);
+  font-family: var(--mono);
+  font-size: 6.5px;
+}
+.knob {
+  position: absolute;
+  right: 16px; top: 56px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  touch-action: none;
+  cursor: ns-resize;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 248, 228, 0.42), rgba(255, 248, 228, 0) 56%),
+    conic-gradient(from 210deg,
+      #cfc2a6, #6f6656 22%, #cfc2a6 46%, #4a443a 70%, #b3a891 88%, #56503f);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 250, 235, 0.45);
+}
+.knob i {
+  position: absolute;
+  left: 50%; top: 4px;
+  width: 2px; height: 12px;
+  margin-left: -1px;
+  background: #1a1512;
+  transform-origin: 50% 16px;
+  transform: rotate(var(--a, -140deg));
+}
+.knob-tag {
+  position: absolute;
+  right: 16px; top: 100px;
+  width: 40px;
+  text-align: center;
+  color: rgba(236, 226, 205, 0.42);
+  font-family: var(--mono);
+  font-size: 6.5px;
+}
+
+/* -------------------------------------------------------- the speakers */
+
+.cone {
+  position: absolute;
+  left: 50%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 246, 226, 0.12), rgba(255, 246, 226, 0) 52%),
+    radial-gradient(closest-side, #221d19 0%, #14100e 62%, #0a0807 100%);
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.9), 0 3px 8px rgba(0, 0, 0, 0.6);
+  transform: translateX(-50%) translateZ(var(--push, 0px));
+  transition: transform 0.06s linear;
+}
+.cone::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 30%; height: 30%;
+  margin: -15% 0 0 -15%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #3b332b, #171310);
+}
+.cone.woof { top: 44px; width: 108px; height: 108px; }
+.cone.tweet { bottom: 54px; width: 46px; height: 46px; }
+
+/* ------------------------------------------------------------ the crate */
+
+.sleeve-tops { position: absolute; inset: 6px 10px; display: flex; gap: 3px; }
+.sleeve {
+  flex: 1;
+  border-radius: 1px;
+  background: linear-gradient(180deg, var(--c), rgba(0, 0, 0, 0.7));
+  box-shadow: inset 0 1px 0 rgba(255, 246, 226, 0.22), 2px 0 3px rgba(0, 0, 0, 0.6);
+  transform: rotate(calc((var(--n) - 2) * 0.7deg));
+}
+.crate-plate {
+  position: absolute;
+  left: 50%; bottom: 26px;
+  width: 74px; height: 22px;
+  margin-left: -37px;
+  background: linear-gradient(180deg, #2b2520, #14100e);
+  box-shadow: inset 0 1px 0 rgba(255, 246, 226, 0.16), 0 2px 5px rgba(0, 0, 0, 0.6);
+}
+
+/* ----------------------------------------------------- the tape machine */
+
+.reel {
+  position: absolute;
+  top: 30px;
+  width: 92px; height: 92px;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, #0a0908 30%, #2c241b 31%, #1a1512 100%);
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.9), 0 3px 6px rgba(0, 0, 0, 0.6);
+}
+.reel-l { left: 22px; }
+.reel-r { right: 22px; }
+.reel.small { background: radial-gradient(closest-side, #0a0908 56%, #2c241b 57%, #1a1512 100%); }
+.reel i {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 6px; height: 42px;
+  margin: -21px 0 0 -3px;
+  background: linear-gradient(180deg, #8b7a60, #4a4038);
+  border-radius: 3px;
+}
+.reel i:nth-child(2) { transform: rotate(60deg); }
+.reel i:nth-child(3) { transform: rotate(120deg); }
+.reel::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 14px; height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: linear-gradient(150deg, #eadfc9, #8c8371 50%, #3c362d);
+}
+.tape-path {
+  position: absolute;
+  left: 46px; right: 46px; top: 116px;
+  height: 22px;
+  border-bottom: 2px solid #0d0b09;
+  border-radius: 0 0 40px 40px;
+}
+.tape-keys { position: absolute; left: 20px; bottom: 14px; display: flex; gap: 8px; }
+.tape-keys b {
+  width: 24px; height: 12px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #d8cdb4, #6d6455);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+}
+.tape-keys b.rec { background: linear-gradient(180deg, #e6704f, #8c2c1d); }
+
+/* ----------------------------------------------------------- the tuner */
+
+.dial {
+  position: absolute;
+  left: 14px; top: 14px;
+  width: 150px; height: 42px;
+  background: linear-gradient(180deg, #1d1708, #0d0b07);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 246, 226, 0.1);
+  overflow: hidden;
+}
+.dial-glass {
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg, rgba(255, 246, 226, 0.16) 0 26%, rgba(255, 246, 226, 0) 56%);
+}
+.dial-mark { position: absolute; top: 8px; width: 1px; height: 10px; background: rgba(212, 160, 74, 0.5); }
+.dial-needle {
+  position: absolute;
+  left: 42%; top: 4px; bottom: 4px;
+  width: 1.6px;
+  background: #e0523a;
+  box-shadow: 0 0 6px rgba(224, 82, 58, 0.9);
+  animation: sweep 13s ease-in-out infinite alternate;
+}
+@keyframes sweep { from { left: 22%; } to { left: 74%; } }
+.tuner-knob {
+  position: absolute;
+  right: 16px; top: 24px;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 248, 228, 0.4), rgba(255, 248, 228, 0) 56%),
+    conic-gradient(from 200deg, #cfc2a6, #625a4b 26%, #b3a891 52%, #4a443a 76%, #a4997f);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+}
+.tuner-knob i {
+  position: absolute;
+  left: 50%; top: 4px;
+  width: 2px; height: 10px;
+  margin-left: -1px;
+  background: #1a1512;
+}
+
+/* ------------------------------------------------------ the headphones */
+
+.hook { position: absolute; left: 50%; top: 0; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #6d6455; }
+.band {
+  position: absolute;
+  left: 50%; top: 4px;
+  width: 92px; height: 92px;
+  margin-left: -46px;
+  border: 9px solid #171412;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 rgba(255, 246, 226, 0.14);
+}
+.band::after {
+  content: "";
+  position: absolute;
+  left: -6px; right: -6px; top: -6px; bottom: -6px;
+  border: 2px solid rgba(139, 129, 112, 0.4);
+  border-bottom-color: transparent;
+  border-radius: 50%;
+}
+.cup {
+  position: absolute;
+  top: 46px;
+  width: 30px; height: 48px;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 0.6px 0.6px, rgba(255, 232, 196, 0.1) 0.35px, rgba(0,0,0,0) 0.6px) 0 0 / 3px 3px,
+    linear-gradient(160deg, #241f1b, #100d0b);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 246, 226, 0.1);
+}
+.cup.l { left: 20px; }
+.cup.r { right: 20px; }
+.cord {
+  position: absolute;
+  right: 26px; top: 92px;
+  width: 40px; height: 80px;
+  border-right: 2px solid #0d0b09;
+  border-bottom: 2px solid #0d0b09;
+  border-radius: 0 0 30px 0;
+}
+
+/* ------------------------------------------------------ the microphone */
+
+.mic-foot {
+  position: absolute;
+  left: 50%; bottom: 0;
+  width: 130px; height: 26px;
+  margin-left: -65px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 40% 30%, #2e2721, #100d0b 70%);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
+}
+.mic-pole {
+  position: absolute;
+  left: 50%; bottom: 14px;
+  width: 8px; height: 400px;
+  margin-left: -4px;
+  background: linear-gradient(90deg, #100e0c, #7d7461 42%, #cabea5 52%, #4a443a 100%);
+}
+.mic-boom {
+  position: absolute;
+  left: 50%; top: 84px;
+  width: 66px; height: 6px;
+  margin-left: -66px;
+  background: linear-gradient(180deg, #cabea5, #5a5344);
+  transform: rotate(9deg);
+  transform-origin: 100% 50%;
+}
+.mic-body {
+  position: absolute;
+  left: 50%; top: 62px;
+  margin-left: -78px;
+  width: 26px; height: 44px;
+  border-radius: 4px;
+  background: linear-gradient(150deg, #d8cdb4, #6d6455 55%, #2f2a24);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.65);
+}
+.mic-head {
+  position: absolute;
+  left: 50%; top: 14px;
+  margin-left: -86px;
+  width: 42px; height: 54px;
+  border-radius: 22px 22px 20px 20px;
+  background:
+    radial-gradient(circle at 0.7px 0.7px, rgba(255, 240, 210, 0.16) 0.4px, rgba(0,0,0,0) 0.8px) 0 0 / 3.4px 3.4px,
+    radial-gradient(circle at 34% 24%, #4a4238, #1a1512 68%);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.7), inset 0 2px 6px rgba(255, 246, 226, 0.1);
+}
+
+/* ---------------------------------------------------------- the guitar */
+
+.g-body {
+  position: absolute;
+  left: 50%; bottom: 0;
+  width: 200px; height: 250px;
+  margin-left: -100px;
+  background:
+    linear-gradient(112deg, #8a5628 0%, #b5793c 26%, #7a4a24 54%, #a06a33 78%, #5c3718 100%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45), 0 14px 30px rgba(0, 0, 0, 0.6);
+  /* the waist is what makes it a guitar and not an oval */
+  clip-path: polygon(
+    34% 0%, 66% 0%, 78% 6%, 84% 18%, 82% 28%, 74% 36%, 74% 42%, 84% 50%,
+    92% 62%, 92% 78%, 82% 92%, 62% 100%, 38% 100%, 18% 92%, 8% 78%, 8% 62%,
+    16% 50%, 26% 42%, 26% 36%, 18% 28%, 16% 18%, 22% 6%);
+}
+.g-hole {
+  position: absolute;
+  left: 50%; bottom: 148px;
+  width: 62px; height: 62px;
+  margin-left: -31px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 34%, #120d08, #050403);
+  box-shadow: 0 0 0 4px rgba(74, 48, 24, 0.9), inset 0 4px 8px rgba(0, 0, 0, 0.9);
+}
+.g-neck {
+  position: absolute;
+  left: 50%; bottom: 236px;
+  width: 34px; height: 296px;
+  margin-left: -17px;
+  background: linear-gradient(90deg, #1c130c, #4a3220 40%, #6b4a2c 56%, #241809);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5);
+}
+.g-head {
+  position: absolute;
+  left: 50%; top: 0;
+  width: 50px; height: 66px;
+  margin-left: -25px;
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(150deg, #4b3320, #251809);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+}
+.g-bridge {
+  position: absolute;
+  left: 50%; bottom: 62px;
+  width: 60px; height: 12px;
+  margin-left: -30px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5a3d24, #1d1309);
+}
+.g-strings { position: absolute; left: 50%; top: 46px; bottom: 62px; width: 26px; margin-left: -13px; }
+.g-strings b {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(232, 220, 192, 0.9), rgba(160, 148, 124, 0.6));
+  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.6);
+}
+.g-strings b:nth-child(1) { left: 0; }
+.g-strings b:nth-child(2) { left: 5px; }
+.g-strings b:nth-child(3) { left: 10px; }
+.g-strings b:nth-child(4) { left: 15px; }
+.g-strings b:nth-child(5) { left: 20px; }
+.g-strings b:nth-child(6) { left: 25px; }
+
+@keyframes string-ring {
+  0% { transform: translateX(0); }
+  22% { transform: translateX(1.6px); }
+  48% { transform: translateX(-1.2px); }
+  74% { transform: translateX(0.6px); }
+  100% { transform: translateX(0); }
+}
+.strummed .g-strings b { animation: string-ring 0.44s ease-out; }
+.strummed .g-strings b:nth-child(2) { animation-delay: 0.03s; }
+.strummed .g-strings b:nth-child(3) { animation-delay: 0.06s; }
+.strummed .g-strings b:nth-child(4) { animation-delay: 0.09s; }
+.strummed .g-strings b:nth-child(5) { animation-delay: 0.12s; }
+.strummed .g-strings b:nth-child(6) { animation-delay: 0.15s; }
+
+/* The capo chip: a small machine clamped to the neck that walks down it as
+   the track plays. It is the only progress indicator in the room. */
+.chip {
+  position: absolute;
+  left: 50%;
+  top: calc(52px + var(--t, 0%) * 2.5);
+  width: 46px; height: 20px;
+  margin-left: -23px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #cfc2a6 0%, #7d7461 46%, #3a342b 100%);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 250, 235, 0.55);
+  transition: top 0.45s linear;
+}
+.chip i {
+  position: absolute;
+  top: 5px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #f2e9d4, #55503f);
+}
+.chip i:nth-child(1) { left: 5px; }
+.chip i:nth-child(2) { right: 5px; }
+.chip span {
+  position: absolute;
+  left: 50%; top: 7px;
+  width: 6px; height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: #7ee08a;
+  box-shadow: 0 0 6px 1px rgba(126, 224, 138, 0.8);
+  opacity: 0.35;
+}
+.room.playing .chip span { opacity: 1; }
+
+/* The crate is open at the front, so the sleeves in it show. */
+.crate-front {
+  position: absolute;
+  left: 12px; right: 12px; top: 10px;
+  height: 76px;
+  background:
+    repeating-linear-gradient(90deg,
+      #2b241c 0 7px, #0e0b09 7px 9px,
+      #4a3627 9px 17px, #0c0a08 17px 19px,
+      #6b4126 19px 26px, #0d0b09 26px 28px,
+      #33293c 28px 35px, #0b0908 35px 37px);
+  box-shadow: inset 0 12px 18px rgba(0, 0, 0, 0.8), inset 0 -6px 10px rgba(0, 0, 0, 0.6);
+}

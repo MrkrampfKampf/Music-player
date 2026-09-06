@@ -47,10 +47,23 @@ everything by touching the equipment in front of you:
 | Headphones | Liked songs |
 | Guitar | Shuffles everything, and the strings ring |
 
-The room is lit by one lamp, dust drifts through it, the deck turns and the
-meters move while something plays. Every object names itself when you touch or
-focus it, all of them are reachable by keyboard, and every screen has the same
-door back to the room in the same corner.
+The room is a real space rather than a picture of one: walls, a floor and every
+object are planes standing in a perspective projection, so they hide each other,
+take the lamp according to the way they face, and slide against one another as
+you tilt the phone. The camera walks up to whatever you touch instead of a panel
+opening over it.
+
+The equipment is the interface, not a skin on one. The tonearm's angle is the
+playhead and you drag it to move through a track. The console's five faders are
+the equaliser and they really travel. The knob beside them is the crossfade and
+it really turns. The capo chip clamped to the guitar's neck walks down it as the
+track plays, and is the only progress indicator anywhere in the room.
+
+One lamp lights it, dust drifts in the beam, the deck turns and the meters move
+while something plays, and the standby lamps breathe when nothing does. Every
+object names itself when you touch or focus it, all of them are reachable by
+keyboard, and there is a light switch by the door that lists the same places in
+words for anyone in a hurry.
 
 This plays records you own, so it is built out of the objects that implies
 rather than out of cards and sliders.
@@ -65,8 +78,7 @@ A **track listing** is set like the back of a sleeve: numbered, with dot
 leaders running out to the time. The **equaliser** is a mixing desk whose
 fader caps you read as a curve rather than as ten numbers. **Settings** is the
 faceplate of an amplifier, with switches that throw and labels screen-printed
-in the metal. The **tab bar** is the row of buttons along the bottom of a
-hi-fi, with a small lamp above the one that is engaged. Albums stand in a
+in the metal. Albums stand in a
 **crate** you push through with a thumb, leaning back behind the one at the
 front. **Crossfade and gain are amp knobs** that turn under your finger and
 detent as they go.

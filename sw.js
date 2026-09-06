@@ -6,12 +6,13 @@
  * not subject to cache eviction the same way.
  */
 
-const VERSION = 'resonate-v5';
+const VERSION = 'resonate-v6';
 const SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/styles.css',
+  './css/room.css',
   './js/main.js',
   './js/db.js',
   './js/tags.js',

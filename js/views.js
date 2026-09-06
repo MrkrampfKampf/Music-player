@@ -408,58 +408,21 @@ function artistCard(artist) {
 export async function renderHome(host) {
   clear(host);
 
-  const greeting = document.getElementById('greeting');
-  if (greeting) greeting.textContent = greetingText();
-
   if (!library.tracks.length) {
     host.append(emptyState({
       icon: 'note',
       title: 'The room is empty',
-      body: 'Bring some records in and the deck has something to play. Add files from '
-        + 'your iPhone, or find music on the Add and Search tabs.',
+      body: 'Bring some records in and the deck has something to play. Add files '
+        + 'from your iPhone, or send the tuner looking for something online.',
       action: { label: 'Add music', onSelect: () => document.getElementById('file-input').click() },
     }));
     return;
   }
 
-  // Home is the studio. The equipment is the navigation.
+  // Home is the room. Nothing is laid on top of it: what is playing shows on
+  // the deck, the position shows on the guitar's capo chip, and everywhere
+  // else in the app is something you can walk up to and touch.
   host.append(renderRoom(el('div', {})));
-
-  // What is on the deck, and a plain way through for anyone who would rather
-  // not hunt for an object.
-  const current = player.current || (await library.recentlyPlayed(1))[0] || library.recentlyAdded[0];
-  if (current) {
-    const strip = el('button', { class: 'room-strip' },
-      artNode(current.artworkKey),
-      el('span', { class: 'room-strip-text' },
-        el('b', { text: current.title }),
-        el('span', { class: 'silk', text: player.playing ? 'Playing now' : 'On the deck' })),
-      el('span', { class: 'icon-btn' }, icon(player.playing ? 'pause' : 'play')));
-    strip.addEventListener('click', () => {
-      if (player.current) player.toggle();
-      else player.play([current], 0);
-      renderHome(host);
-    });
-    host.append(strip);
-  }
-
-  host.append(el('div', { class: 'room-doors' },
-    [['Library', () => router({ view: 'library', tab: 'albums' })],
-      ['Liked', () => router({ view: 'playlist', key: LIKED_ID })],
-      ['Playlists', () => router({ view: 'library', tab: 'playlists' })]]
-      .map(([label, onSelect]) => el('button', {
-        class: 'chip',
-        text: label,
-        onclick: () => { press(); onSelect(); },
-      }))));
-}
-
-function greetingText() {
-  const hour = new Date().getHours();
-  if (hour < 5) return 'Late Night';
-  if (hour < 12) return 'Good Morning';
-  if (hour < 18) return 'Good Afternoon';
-  return 'Good Evening';
 }
 
 function emptyState({ icon: iconName, title, body, action }) {

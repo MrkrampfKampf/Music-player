@@ -51,6 +51,9 @@ function render() {
   for (const section of document.querySelectorAll('.view')) {
     section.hidden = section.dataset.view !== state.view;
   }
+  // In the room the equipment reports what is playing, so the player bar
+  // stays out of it.
+  document.body.classList.toggle('in-room', state.view === 'home');
 
   const main = document.getElementById('main');
 
@@ -91,6 +94,7 @@ setRoomRouter((where) => {
   else if (where === 'search') { state.searchScope = 'library'; navigate({ view: 'search' }); }
   else if (where === 'find') { state.searchScope = 'online'; resetDiscover(); navigate({ view: 'search' }); }
   else if (where === 'liked') navigate({ view: 'playlist', key: LIKED_ID });
+  else if (where === 'playlists') navigate({ view: 'library', tab: 'playlists' });
 });
 
 function openPlayerFromRoom() {
@@ -134,7 +138,10 @@ function wireChrome() {
     tab.addEventListener('click', () => { press(); navigate({ view: 'library', tab: tab.dataset.tab }); });
   }
 
-  document.querySelector('[data-action="open-settings"]').addEventListener('click', () => navigate({ view: 'settings' }));
+  // Home has no settings button of its own any more: the mixing console is
+  // the settings, and the light switch by the door lists everything by name.
+  const gear = document.querySelector('[data-action="open-settings"]');
+  if (gear) gear.addEventListener('click', () => navigate({ view: 'settings' }));
   document.querySelector('[data-action="import"]').addEventListener('click', () => document.getElementById('file-input').click());
 
   for (const tab of document.querySelectorAll('#search-tabs [data-scope]')) {

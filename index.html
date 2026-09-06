@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/room.css">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -24,13 +25,9 @@
   <!-- Scrolling content. One view is visible at a time. -->
   <main id="main" class="main">
 
+    <!-- Home has no chrome of its own. The room fills it, and the equipment
+         in the room is the navigation. -->
     <section class="view" data-view="home" hidden>
-      <header class="view-head">
-        <h1 id="greeting">Listen Now</h1>
-        <button class="icon-btn" data-action="open-settings" aria-label="Settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"/></svg>
-        </button>
-      </header>
       <div id="home-body"></div>
     </section>
 
