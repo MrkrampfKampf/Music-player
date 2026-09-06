@@ -59,7 +59,7 @@ above. No filenames-as-titles unless a file genuinely has no tags.
 | Crossfade | 2 to 12 seconds |
 | Sleep timer | By minutes, or at the end of the current song |
 | Speed | 0.5x to 2x |
-| Lock screen | Play, pause, skip and scrub from the Lock Screen and Control Centre |
+| Lock screen | Play, pause, next, previous and scrub from the Lock Screen and Control Centre |
 | Quality badges | Lossless and Hi-Res markers, full format details per track |
 
 **Everything stays on your phone.** No account, no sync, no analytics. Ask iOS
@@ -154,6 +154,13 @@ The app cannot delete the originals for you. A web page gets read-only access
 to the files you hand it and has no way to change anything on disk, so step 3
 is yours.
 
+**Subfolders have to be visited one at a time.** iOS offers web pages no folder
+picker, only a file picker, so an album inside an album inside the Spotify
+folder means opening each one and selecting what is in it. Nothing in the app
+can shortcut that. It does at least reopen wherever you last were, and skips
+anything already imported, so working through a nested folder tree is tedious
+rather than error-prone.
+
 Re-importing is always safe: a file already in the library is recognised and
 skipped, so nothing is ever duplicated and you cannot lose your place.
 
@@ -247,11 +254,14 @@ and checks the library survives a reload. It needs Playwright:
 ```sh
 npx http-server -p 8099 -c-1 .
 node test/browser.test.mjs http://127.0.0.1:8099
+node test/mediasession.test.mjs http://127.0.0.1:8099
 node test/offline.test.mjs http://127.0.0.1:8099
 node test/quota.test.mjs http://127.0.0.1:8099
 ```
 
-The offline one cuts the network entirely and checks the app still starts,
+The media session one records which lock screen actions the app claims,
+because claiming the wrong ones silently costs you the skip buttons. The
+offline one cuts the network entirely and checks the app still starts,
 because a service worker that quietly fails to register looks completely
 normal until you have no signal. The quota one fills the storage mid-import
 and checks it stops cleanly and resumes.

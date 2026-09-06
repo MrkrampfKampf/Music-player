@@ -83,6 +83,9 @@ class Player extends EventTarget {
 
     this._tick = this._tick.bind(this);
     this._rafId = null;
+    this._lastPositionSync = 0;
+
+    this._initMediaSession();
   }
 
   /* ------------------------------------------------------------- elements */
@@ -343,19 +346,35 @@ class Player extends EventTarget {
     }
   }
 
-  /** Warm the idle element with the next track so the handover is seamless. */
+  /**
+   * Get the next track ready.
+   *
+   * By default this only reads it out of the database and makes an object URL,
+   * so the switch does not wait on storage. It deliberately does not touch the
+   * second audio element: iOS binds the lock screen to whichever element owns
+   * the audio session, and loading a second one costs the transport buttons.
+   * Only crossfade, which genuinely needs two elements, primes the other one.
+   */
   async _schedulePreload() {
     if (this.isVideo) return;
     const nextId = this._peekNextId();
     if (!nextId || nextId === this._pendingPreload) return;
     this._pendingPreload = nextId;
+
     const url = await this._urlFor(nextId);
     if (!url || this._pendingPreload !== nextId) return;
+
+    if (!this._usesTwoElements) return;
     const idle = this.idleAudio;
     if (idle.src !== url) {
       idle.src = url;
       idle.load();
     }
+  }
+
+  /** Two elements are only worth their cost on iOS when crossfading. */
+  get _usesTwoElements() {
+    return this.crossfadeSeconds > 0;
   }
 
   _peekNextId() {
@@ -443,7 +462,7 @@ class Player extends EventTarget {
 
   /** Hand playback to the element that already has the next track buffered. */
   _swapElements() {
-    if (this.isVideo) return;
+    if (this.isVideo || !this._usesTwoElements) return;
     const idle = this.idleAudio;
     const nextUrl = this._pendingPreload ? this._urls.get(this._pendingPreload) : null;
     if (nextUrl && idle.src === nextUrl) {
@@ -674,7 +693,12 @@ class Player extends EventTarget {
     this._maybeScrobble();
     this._maybeCrossfade();
 
-    if ('mediaSession' in navigator && navigator.mediaSession.setPositionState && this.playing) {
+    // The lock screen only needs this about once a second, and hammering it
+    // every frame is a good way to upset WebKit.
+    const now = Date.now();
+    if ('mediaSession' in navigator && navigator.mediaSession.setPositionState
+      && this.playing && now - this._lastPositionSync > 900) {
+      this._lastPositionSync = now;
       const d = this.duration;
       if (d > 0 && this.currentTime <= d) {
         try {
@@ -753,6 +777,39 @@ class Player extends EventTarget {
 
   /* -------------------------------------------------------- media session */
 
+  /**
+   * Wire the lock screen controls once, at startup.
+   *
+   * Two things matter here. Registration is synchronous and happens before any
+   * track exists, because doing it per track behind an await for artwork left
+   * the buttons dead until that finished. And seekbackward/seekforward are
+   * deliberately left unregistered: iOS replaces the previous and next track
+   * buttons with fifteen second skip arrows the moment those are claimed, so
+   * registering them takes away the control people actually reach for.
+   */
+  _initMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+
+    const handlers = {
+      play: () => { this.resume(); },
+      pause: () => { this.pause(); },
+      previoustrack: () => { this.previous(); },
+      nexttrack: () => { this.next(); },
+      stop: () => { this.pause(); },
+      // Keeps the lock screen scrubber working without costing the skip buttons.
+      seekto: (d) => { if (d && d.seekTime != null) this.seek(d.seekTime); },
+    };
+
+    for (const [action, handler] of Object.entries(handlers)) {
+      try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* unsupported */ }
+    }
+
+    // Explicitly disown these so iOS shows track skip rather than +/- 15s.
+    for (const action of ['seekbackward', 'seekforward']) {
+      try { navigator.mediaSession.setActionHandler(action, null); } catch { /* unsupported */ }
+    }
+  }
+
   async _updateMediaSession() {
     if (!('mediaSession' in navigator) || !this.current) return;
     const t = this.current;
@@ -777,19 +834,6 @@ class Player extends EventTarget {
       });
     } catch { /* older WebKit */ }
 
-    const handlers = {
-      play: () => this.resume(),
-      pause: () => this.pause(),
-      previoustrack: () => this.previous(),
-      nexttrack: () => this.next(),
-      seekbackward: (d) => this.seekBy(-(d && d.seekOffset ? d.seekOffset : 15)),
-      seekforward: (d) => this.seekBy(d && d.seekOffset ? d.seekOffset : 15),
-      seekto: (d) => { if (d && d.seekTime != null) this.seek(d.seekTime); },
-      stop: () => this.pause(),
-    };
-    for (const [action, handler] of Object.entries(handlers)) {
-      try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* unsupported action */ }
-    }
   }
 
   /* --------------------------------------------------------- persistence */
