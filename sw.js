@@ -6,7 +6,7 @@
  * not subject to cache eviction the same way.
  */
 
-const VERSION = 'resonate-v2';
+const VERSION = 'resonate-v3';
 const SHELL = [
   './',
   './index.html',
@@ -24,6 +24,7 @@ const SHELL = [
   './js/nowplaying.js',
   './js/addview.js',
   './js/settings.js',
+  './js/tactile.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-180.png',

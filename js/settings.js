@@ -9,6 +9,7 @@ import {
   el, icon, clear, toast, formatBytes, menuSheet, confirmSheet, promptSheet,
   bindRangePaint, paintRange, plural,
 } from './ui.js';
+import { configureTactile, flip, tick, asButton } from './tactile.js';
 
 export const settings = {
   theme: 'dark',
@@ -22,6 +23,8 @@ export const settings = {
   preamp: 0,
   resumeOnLaunch: true,
   volume: 1,
+  haptics: true,
+  uiSound: true,
 };
 
 export async function loadSettings() {
@@ -35,6 +38,7 @@ export async function loadSettings() {
   player.preampDb = settings.preamp;
   if (settings.eqEnabled) player.setEqEnabled(true);
   if (settings.crossfade > 0) player.setCrossfade(settings.crossfade);
+  configureTactile({ haptics: settings.haptics, sound: settings.uiSound });
 }
 
 export async function saveSettings() {
@@ -55,6 +59,7 @@ export async function renderSettings(host) {
   host.append(await playbackGroup());
   host.append(audioGroup(host));
   host.append(converterGroup(host));
+  host.append(feelGroup(host));
   host.append(appearanceGroup(host));
   host.append(await storageGroup(host));
   host.append(aboutGroup());
@@ -74,6 +79,7 @@ function toggleRow(label, description, checked, onChange) {
   row.addEventListener('click', () => {
     const next = sw.getAttribute('aria-checked') !== 'true';
     sw.setAttribute('aria-checked', String(next));
+    flip();
     onChange(next);
   });
   return row;
@@ -221,8 +227,11 @@ function eqSliders(host) {
       'aria-label': freqLabel(freq) + ' band',
     });
 
+    let lastNotch = Math.round(settings.eqGains[index]);
     slider.addEventListener('input', () => {
       const gain = Number(slider.value);
+      const notch = Math.round(gain);
+      if (notch !== lastNotch) { lastNotch = notch; tick(); }
       settings.eqGains[index] = gain;
       settings.eqPreset = 'Custom';
       value.textContent = fmtGain(gain);
@@ -345,6 +354,29 @@ function shortHost(url) {
 }
 
 /* ------------------------------------------------------------- appearance */
+
+function feelGroup(host) {
+  return group('Feel',
+    toggleRow('Haptics', 'A tap for a key, a bump for a switch, ticks along the grooves.',
+      settings.haptics, async (on) => {
+        settings.haptics = on;
+        configureTactile({ haptics: on });
+        await saveSettings();
+      }),
+    toggleRow('Mechanical sounds', 'Quiet clicks and knocks from the controls. Synthesised, nothing to download.',
+      settings.uiSound, async (on) => {
+        settings.uiSound = on;
+        configureTactile({ sound: on });
+        await saveSettings();
+      }),
+    el('div', { class: 'setting', style: { display: 'block' } },
+      el('div', { class: 'setting-text' },
+        el('span', {
+          text: 'Haptics need iOS 17.4 or later, and only work once the app is on '
+            + 'your Home Screen. Sounds are separate from playback and never touch '
+            + 'the bit-perfect route.',
+        }))));
+}
 
 function appearanceGroup(host) {
   return group('Appearance',

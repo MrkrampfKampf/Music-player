@@ -14,6 +14,7 @@ import { initNowPlaying, isPlayerOpen, closePlayer } from './nowplaying.js';
 import { renderHome, renderLibrary, renderSearch, renderDetail, setRouter } from './views.js';
 import { initAdd, renderAdd, importPickedFiles } from './addview.js';
 import { closeSheet, isSheetOpen, toast } from './ui.js';
+import { asButton, press } from './tactile.js';
 
 const state = {
   view: 'home',
@@ -103,6 +104,7 @@ window.addEventListener('popstate', (event) => {
 
 function wireChrome() {
   for (const button of document.querySelectorAll('[data-nav]')) {
+    asButton(button);
     button.addEventListener('click', () => {
       const target = button.dataset.nav;
       // Tapping the tab you are already on scrolls back to the top.
@@ -115,7 +117,7 @@ function wireChrome() {
   }
 
   for (const tab of document.querySelectorAll('#library-tabs [data-tab]')) {
-    tab.addEventListener('click', () => navigate({ view: 'library', tab: tab.dataset.tab }));
+    tab.addEventListener('click', () => { press(); navigate({ view: 'library', tab: tab.dataset.tab }); });
   }
 
   document.querySelector('[data-action="open-settings"]').addEventListener('click', () => navigate({ view: 'settings' }));

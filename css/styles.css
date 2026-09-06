@@ -226,11 +226,15 @@ h2.section-title::after {
   box-shadow: var(--bevel);
   transition: transform 0.09s var(--ease), color 0.15s, background 0.15s;
 }
-.icon-btn:active {
-  transform: translateY(1px);
-  box-shadow: var(--bevel-deep);
+/* A key travels into its well and the cap darkens as it goes. */
+.icon-btn:active,
+.icon-btn.pushed {
+  transform: translateY(2px) scaleY(0.96);
+  box-shadow: var(--bevel-deep), inset 0 0 8px rgba(0, 0, 0, 0.5);
   color: var(--text);
+  background: color-mix(in srgb, var(--raised) 82%, #000);
 }
+.icon-btn { transition: transform 0.07s var(--ease), box-shadow 0.07s, background 0.07s, color 0.15s; }
 .icon-btn.on { color: var(--accent); }
 .icon-btn.big svg { width: 26px; height: 26px; }
 
@@ -274,7 +278,7 @@ h2.section-title::after {
   box-shadow: var(--bevel);
   transition: transform 0.09s var(--ease), background 0.15s;
 }
-.btn:active { transform: translateY(1px); box-shadow: var(--bevel-deep); }
+.btn:active, .btn.pushed { transform: translateY(2px) scaleY(0.97); box-shadow: var(--bevel-deep), inset 0 0 10px rgba(0,0,0,0.4); }
 .btn.primary,
 .detail-actions .btn:first-child,
 .list-head .btn:first-child {
@@ -669,21 +673,32 @@ h2.section-title::after {
   box-shadow:
     0 0 0 6px var(--raised),
     0 0 0 7px rgba(0,0,0,0.6),
+    inset 0 0 40px rgba(0,0,0,0.9),
     var(--cast);
-  transform: rotate(0deg);
 }
-
-/* Rotation is the play state. Nothing else needs to say "playing". */
-.platter-spin {
+/* The sheen stays put while the record turns under it, which is what makes
+   the surface read as vinyl rather than as a spinning texture. */
+.platter::after {
+  content: "";
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  animation: spin 1.8s linear infinite;
-  animation-play-state: paused;
-  /* Spin-up and spin-down have weight, like a real platter. */
-  transition: opacity 0.3s;
+  pointer-events: none;
+  background:
+    linear-gradient(122deg,
+      rgba(255, 244, 222, 0.13) 0%,
+      rgba(255, 244, 222, 0.03) 18%,
+      transparent 34%,
+      transparent 62%,
+      rgba(255, 244, 222, 0.05) 80%,
+      rgba(255, 244, 222, 0.11) 100%);
+  mix-blend-mode: screen;
 }
-.np:not(.paused) .platter-spin { animation-play-state: running; }
+
+/* Rotation is the play state. Nothing else needs to say "playing". */
+/* Rotation comes from nowplaying.js so the platter can spin up and coast
+   down with weight. A CSS animation can only be running or stopped. */
+.platter-spin { position: absolute; inset: 0; border-radius: 50%; will-change: transform; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* The label at the centre is where the album art lives. */
@@ -693,7 +708,17 @@ h2.section-title::after {
   border-radius: 50%;
   overflow: hidden;
   background: var(--hot);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.label::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(122deg, rgba(255,255,255,0.14), transparent 45%);
+  pointer-events: none;
 }
 .label img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
@@ -724,11 +749,9 @@ h2.section-title::after {
     transparent 1.6deg 7.5deg);
   -webkit-mask: radial-gradient(circle, transparent 0 93%, #000 94% 100%);
   mask: radial-gradient(circle, transparent 0 93%, #000 94% 100%);
-  animation: spin 3.2s linear infinite;
-  animation-play-state: paused;
   pointer-events: none;
+  will-change: transform;
 }
-.np:not(.paused) .strobe { animation-play-state: running; }
 
 /* --------------------------------------------------------------- the arm */
 
@@ -751,6 +774,8 @@ h2.section-title::after {
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55));
 }
 .tonearm.dragging { transition: none; cursor: grabbing; }
+/* The arm settles rather than snapping when you let go of it. */
+.tonearm:not(.dragging) { transition: transform 0.42s cubic-bezier(0.18, 0.9, 0.28, 1); }
 .tonearm svg { width: 100%; height: 100%; overflow: visible; }
 
 /* Lifted off the record when paused, the way a cue lever parks it. */
@@ -844,13 +869,21 @@ h2.section-title::after {
   bottom: 4px;
   left: 4px;
   width: 42px;
-  background: linear-gradient(180deg, #ded3bb, #9a8f76);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.55);
-  transition: transform 0.26s var(--mech);
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,0.16) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #efe5cd 0%, #cfc3a8 42%, #9a8f76 44%, #7d7360 100%);
+  box-shadow:
+    0 3px 5px rgba(0,0,0,0.65),
+    inset 0 1px 0 rgba(255,255,255,0.75),
+    inset 0 -2px 3px rgba(0,0,0,0.35);
+  transition: transform 0.24s var(--mech);
   display: grid;
   place-items: center;
   color: #241d13;
+  touch-action: none;
 }
+.cue:active .cue-knob { box-shadow: 0 1px 2px rgba(0,0,0,0.7), inset 0 2px 4px rgba(0,0,0,0.4); }
 .cue-knob svg { width: 18px; height: 18px; }
 .np:not(.paused) .cue-knob { transform: translateX(42px); }
 .cue-label {
@@ -1289,10 +1322,16 @@ textarea { min-height: 90px; resize: vertical; }
   left: 2px;
   width: 18px;
   height: 20px;
-  background: linear-gradient(180deg, #ded3bb, #978b72);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.6);
-  transition: transform 0.18s var(--mech);
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.14) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #efe5cd 0%, #cbbfa4 48%, #8e8369 100%);
+  box-shadow:
+    0 2px 3px rgba(0,0,0,0.7),
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    inset 0 -1px 2px rgba(0,0,0,0.3);
+  transition: transform 0.16s var(--mech);
 }
+.switch:active::after { box-shadow: 0 1px 1px rgba(0,0,0,0.8), inset 0 2px 3px rgba(0,0,0,0.35); }
 .switch[aria-checked="true"] { border-color: var(--accent); }
 .switch[aria-checked="true"]::after { transform: translateX(20px); }
 
@@ -1500,8 +1539,6 @@ input[type="range"]::-moz-range-thumb { width: 13px; height: 22px; border: 0; bo
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, .platter-spin, .strobe, .mini-art { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-  .np:not(.paused) .platter-spin,
-  .np:not(.paused) .strobe,
+  *, .mini-art { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   body.playing .mini-art { animation-play-state: paused; }
 }

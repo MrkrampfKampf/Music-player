@@ -14,6 +14,7 @@ import {
   el, icon, clear, artworkUrl, accentFromArtwork, formatTime,
   bindRangePaint, paintRange, makeSortable, menuSheet, toast, artNode,
 } from './ui.js';
+import { asButton, press, tick, needleDrop, lever, bump } from './tactile.js';
 
 const DEFAULT_ACCENT = '#ff2d55';
 
@@ -41,7 +42,6 @@ export function initNowPlaying() {
   // Going back is what actually closes the player, so the pushed history
   // entry is consumed rather than left behind for the next back gesture.
   $('np-close').addEventListener('click', () => history.back());
-  $('np-play').addEventListener('click', () => player.toggle());
   $('np-next').addEventListener('click', () => player.next());
   $('np-prev').addEventListener('click', () => player.previous());
   $('np-shuffle').addEventListener('click', () => { player.setShuffle(!player.shuffle); paintModes(); });
@@ -56,6 +56,12 @@ export function initNowPlaying() {
   });
 
   attachTonearm();
+  attachCue();
+  startPlatter();
+
+  for (const id of ['np-prev', 'np-next', 'np-shuffle', 'np-repeat', 'np-like']) {
+    asButton($(id));
+  }
 
   const vol = $('np-vol');
   bindRangePaint(vol);
@@ -103,6 +109,48 @@ export function initNowPlaying() {
 
   paintModes();
   paintState();
+}
+
+/* ------------------------------------------------------------- the platter */
+
+/*
+ * A platter has mass. It takes a moment to come up to speed when you start it
+ * and it coasts down rather than stopping dead, so the rotation is driven by
+ * hand instead of by a CSS animation that can only be on or off.
+ *
+ * 33 1/3 rpm is 200 degrees a second.
+ */
+const RPM_33 = 200;
+let platterAngle = 0;
+let platterSpeed = 0;
+let platterRaf = null;
+let platterLast = 0;
+
+function startPlatter() {
+  if (platterRaf != null) return;
+  platterLast = performance.now();
+  const step = (now) => {
+    const dt = Math.min(0.05, (now - platterLast) / 1000);
+    platterLast = now;
+
+    const target = player.playing ? RPM_33 * player.playbackRate : 0;
+    // Spinning up is quicker than coasting down, as on a real belt drive.
+    const rate = target > platterSpeed ? 3.4 : 1.5;
+    platterSpeed += (target - platterSpeed) * Math.min(1, dt * rate * 2);
+    if (Math.abs(platterSpeed - target) < 0.4) platterSpeed = target;
+
+    if (platterSpeed > 0.01) {
+      platterAngle = (platterAngle + platterSpeed * dt) % 360;
+      const spin = $('platter-spin');
+      const strobe = $('strobe');
+      if (spin) spin.style.transform = 'rotate(' + platterAngle.toFixed(2) + 'deg)';
+      // The rim marks run at their own rate, which is what makes them read.
+      if (strobe) strobe.style.transform = 'rotate(' + (platterAngle * 0.56).toFixed(2) + 'deg)';
+    }
+
+    platterRaf = requestAnimationFrame(step);
+  };
+  platterRaf = requestAnimationFrame(step);
 }
 
 export function isPlayerOpen() {
@@ -271,8 +319,12 @@ function attachTonearm() {
     return Math.min(1, Math.max(0, swept));
   };
 
+  let lastTick = 0;
+
   const preview = (fraction) => {
     setArm(fraction);
+    // One tick per groove crossed, so the drag has texture under the finger.
+    if (Math.abs(fraction - lastTick) > 0.022) { lastTick = fraction; tick(); }
     const d = player.duration;
     if (!d) return;
     $('np-elapsed').textContent = formatTime(fraction * d);
@@ -280,7 +332,7 @@ function attachTonearm() {
   };
 
   const onDown = (event) => {
-    if (!player.current) return;
+    if (!player.current) { bump(); return; }
     // The deck's own box already includes its offset, so the pivot is simply
     // the fraction of it that the stylesheet places the pivot at.
     const deckBox = deck.getBoundingClientRect();
@@ -307,7 +359,7 @@ function attachTonearm() {
     arm.classList.remove('dragging');
     setTimeout(() => deck.classList.remove('touched'), 900);
     const d = player.duration;
-    if (d) player.seek(fraction * d);
+    if (d) { player.seek(fraction * d); needleDrop(); }
     else setArm(0);
   };
 
@@ -328,8 +380,10 @@ function attachTonearm() {
 
   // Tapping the record itself starts and stops it, the way you would stop a
   // platter with your hand.
+  // A palm on the platter, the way you would stop one.
   deck.addEventListener('click', (event) => {
     if (event.target.closest('#tonearm')) return;
+    if (player.playing) bump(); else needleDrop();
     player.toggle();
   });
 }
@@ -467,6 +521,70 @@ function importLyricsFor(track) {
     toast(parsed.kind === 'synced' ? 'Synced lyrics added' : 'Lyrics added');
   };
   input.click();
+}
+
+/* --------------------------------------------------------- the cue lever */
+
+/**
+ * The lever slides under the finger and seats at whichever end you let go
+ * nearest, the way a cue control actually works. A plain tap throws it.
+ */
+function attachCue() {
+  const cue = $('np-play');
+  const knob = cue && cue.querySelector('.cue-knob');
+  if (!cue || !knob) return;
+
+  const THROW = 42;
+  let dragging = false;
+  let startX = 0;
+  let startOffset = 0;
+  let moved = 0;
+
+  const offsetNow = () => (player.playing ? THROW : 0);
+
+  const place = (x, animate) => {
+    knob.style.transition = animate ? '' : 'none';
+    knob.style.transform = 'translateX(' + x + 'px)';
+  };
+
+  cue.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    moved = 0;
+    startX = event.clientX;
+    startOffset = offsetNow();
+    cue.setPointerCapture(event.pointerId);
+    press();
+  });
+
+  cue.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - startX;
+    moved = Math.max(moved, Math.abs(dx));
+    place(Math.max(0, Math.min(THROW, startOffset + dx)), false);
+  });
+
+  const settle = (event) => {
+    if (!dragging) return;
+    dragging = false;
+    knob.style.transition = '';
+    knob.style.transform = '';
+
+    const dx = (event.clientX || startX) - startX;
+    // A tap throws it; a drag goes wherever you left it nearest.
+    const wantPlaying = moved < 6
+      ? !player.playing
+      : startOffset + dx > THROW / 2;
+
+    if (wantPlaying !== player.playing) {
+      lever();
+      player.toggle();
+    }
+  };
+
+  cue.addEventListener('pointerup', settle);
+  cue.addEventListener('pointercancel', settle);
+  // The click would double-fire after the pointer handling above.
+  cue.addEventListener('click', (event) => event.preventDefault());
 }
 
 /* ------------------------------------------------------------------ queue */

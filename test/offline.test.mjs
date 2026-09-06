@@ -41,7 +41,11 @@ const cached = await page.evaluate(async () => {
   const c = await caches.open(names[0]);
   return { names, count: (await c.keys()).length };
 });
-check('cache is version 2', cached.names.includes('resonate-v2'), JSON.stringify(cached.names));
+// Read the version from the worker rather than pinning it here, so bumping
+// the cache does not fail a test that is about offline behaviour.
+const swVersion = (await (await fetch(BASE + '/sw.js')).text()).match(/VERSION = '([^']+)'/)[1];
+check('cache matches the service worker version', cached.names.includes(swVersion),
+  swVersion + ' vs ' + JSON.stringify(cached.names));
 check('shell is cached', cached.count >= 12, String(cached.count));
 
 log('going offline');

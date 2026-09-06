@@ -4,6 +4,7 @@
  */
 
 import * as db from './db.js';
+import { press } from './tactile.js';
 
 /* ------------------------------------------------------------------ markup */
 
@@ -184,7 +185,7 @@ export function menuSheet(title, items, headerNode) {
       if (!item) continue;
       const row = el('button', {
         class: 'menu-item' + (item.destructive ? ' destructive' : ''),
-        onclick: () => { close(); setTimeout(() => item.onSelect(), 60); },
+        onclick: () => { press(); close(); setTimeout(() => item.onSelect(), 60); },
       }, item.icon ? icon(item.icon) : el('span', { style: { width: '21px' } }), el('span', { text: item.label }));
       if (item.checked) row.append(el('span', { class: 'check' }, icon('check', 20)));
       body.append(row);

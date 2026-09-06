@@ -52,6 +52,23 @@ Square corners, light from above, and one fixed brass accent throughout. The
 record on the platter tints the lamp over the deck, but it never repaints the
 rest of the app: the machine keeps its own colour.
 
+The parts behave like parts. The platter has mass: it takes a moment to come
+up to speed and coasts down rather than stopping dead, and the sheen across
+the vinyl stays put while the record turns underneath it. The cue lever slides
+under your finger and seats at whichever end you let go nearest. Keys travel
+into their wells and spring back. Switches throw over a detent.
+
+Feedback is matched to the part rather than sprayed at every tap: a click for
+a key, a bump for a switch, a tick for each groove the stylus crosses while
+you drag the arm, and a low thud when it lands. Sounds are synthesised, so
+there is nothing to download and they work offline; they run in their own
+mixer, separate from the bit-perfect playback route. Both haptics and sound
+have switches in **Settings → Feel**.
+
+Haptics need iOS 17.4 or later and only work from the Home Screen app, because
+Safari has no vibrate API and the only route to the system's tap is a hidden
+switch control.
+
 ## What it does
 
 **Your files, untouched.** Import MP3, M4A, AAC, WAV, FLAC, AIFF, ALAC, Ogg and
