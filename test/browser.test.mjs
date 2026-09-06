@@ -191,6 +191,40 @@ check('lyrics pane opens', await page.isVisible('#np-lyrics'));
 await page.click('#np-lyrics-btn');
 await page.waitForTimeout(300);
 
+/* -------------------------------------------------- the file picker itself */
+console.log('The import controls');
+{
+  await page.evaluate(() => {
+    document.getElementById('np').hidden = true;
+    document.body.style.overflow = '';
+  });
+  await page.click('[data-nav="add"]');
+  await page.waitForTimeout(500);
+
+  // An accept list greys out files iOS has no type for, so there must not be one.
+  const accept = await page.getAttribute('#file-input', 'accept');
+  check('the picker is not filtered by type', accept === null, String(accept));
+  check('the picker takes several files at once',
+    (await page.getAttribute('#file-input', 'multiple')) !== null);
+
+  const buttons = await page.evaluate(() =>
+    [...document.querySelectorAll('#add-body button')].map((b) => b.textContent.trim()));
+  check('there is a Spotify folder button', buttons.some((b) => /Spotify folder/i.test(b)), JSON.stringify(buttons));
+
+  await page.click('#add-body button:has-text("Spotify folder")');
+  await page.waitForTimeout(500);
+  const sheet = await page.evaluate(() => {
+    const host = document.getElementById('sheet-host');
+    return { open: !host.hidden, steps: host.querySelectorAll('.setting').length, text: host.textContent };
+  });
+  check('it explains the route', sheet.open && sheet.steps === 3, JSON.stringify({ open: sheet.open, steps: sheet.steps }));
+  check('it names the actual folder', /On My iPhone/.test(sheet.text) && /Spotify folder/.test(sheet.text));
+  check('it warns about copying', /copies each file/.test(sheet.text));
+
+  await page.evaluate(() => document.querySelector('.sheet-backdrop').click());
+  await page.waitForTimeout(400);
+}
+
 /* ------------------------------------------------- safe-to-delete listing */
 console.log('Telling the user what is safe to delete');
 {

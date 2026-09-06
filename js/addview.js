@@ -38,6 +38,11 @@ export function renderAdd(host) {
       class: 'btn wide',
       onclick: () => document.getElementById('file-input').click(),
     }, icon('plus', 20), el('span', { text: 'Choose files' })),
+    el('button', {
+      class: 'btn wide secondary',
+      style: { marginTop: '10px' },
+      onclick: spotifyFolderHelp,
+    }, icon('note', 20), el('span', { text: 'From my Spotify folder' })),
     el('p', {
       class: 'hint',
       style: { marginTop: '10px' },
@@ -509,4 +514,52 @@ function repaintSafeToDelete() {
   else if (next) host.append(next);
 
   if (next) next.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/**
+ * Guidance for pulling in music Spotify holds as Local Files.
+ *
+ * There is no way to skip the picker. A web page cannot read a path, iOS has
+ * no folder picker for the web, and Safari cannot receive files from the share
+ * sheet either. So the honest thing is to name the exact route and then open
+ * the picker, rather than pretend a button can do it alone.
+ */
+function spotifyFolderHelp() {
+  const step = (n, text) => el('div', { class: 'setting' },
+    el('div', {
+      style: {
+        flex: 'none', width: '24px', height: '24px', borderRadius: '50%',
+        background: 'var(--accent)', color: '#fff', display: 'grid',
+        placeItems: 'center', fontSize: '13px', fontWeight: '700',
+      },
+      text: String(n),
+    }),
+    el('div', { class: 'setting-text' }, el('span', { text, style: { color: 'var(--text)', fontSize: '14px' } })));
+
+  menuSheet(null, [], el('div', {},
+    el('h2', { text: 'From your Spotify folder' }),
+    el('p', {
+      text: 'Music you added to Spotify yourself sits in a normal folder you can open. '
+        + 'Tap below and the picker opens; from there it is three taps.',
+      style: { color: 'var(--text-dim)', margin: '0 0 14px', lineHeight: '1.5' },
+    }),
+    el('div', { class: 'card-box', style: { marginBottom: '14px' } },
+      step(1, 'Tap Browse at the bottom, then On My iPhone.'),
+      step(2, 'Open the Spotify folder.'),
+      step(3, 'Tap the songs you want. You can pick many at once.')),
+    el('p', {
+      text: 'Next time the picker opens in that same folder, so it is one tap after this.',
+      style: { color: 'var(--text-faint)', fontSize: '13px', margin: '0 0 8px', lineHeight: '1.5' },
+    }),
+    el('p', {
+      text: 'Take an album at a time rather than everything. Importing copies each file, '
+        + 'so a batch at a time is what keeps you from needing room for two full copies. '
+        + 'Anything already here is skipped, so you can run this as often as you like.',
+      style: { color: 'var(--text-faint)', fontSize: '13px', margin: '0 0 18px', lineHeight: '1.5' },
+    }),
+    el('button', {
+      class: 'btn wide',
+      text: 'Open the picker',
+      onclick: () => { closeSheet(); document.getElementById('file-input').click(); },
+    })));
 }

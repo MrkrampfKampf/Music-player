@@ -216,7 +216,10 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <input id="file-input" type="file" multiple accept="audio/*,video/*,.mp3,.m4a,.wav,.flac,.aac,.ogg,.opus,.aiff,.aif,.mp4,.m4v,.mov" hidden>
+  <!-- Deliberately unfiltered. An accept list greys out anything iOS has no
+       type for, which on a phone means FLAC and Opus files you own cannot be
+       tapped at all. Everything is selectable and the import filters after. -->
+  <input id="file-input" type="file" multiple hidden>
   <input id="art-input" type="file" accept="image/*" hidden>
   <input id="lrc-input" type="file" accept=".lrc,.txt,text/plain" hidden>
   <input id="backup-input" type="file" accept=".json,application/json" hidden>

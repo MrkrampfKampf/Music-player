@@ -138,8 +138,8 @@ Safari gives a web app no way to play a file that stays where it is, so
 importing copies it. On a full phone that matters, and the way through is to
 move rather than duplicate:
 
-1. In the app, tap **Add → Choose files** and pick one album's worth from
-   **On My iPhone → Spotify**.
+1. In the app, tap **Add → From my Spotify folder**, which spells out the
+   route, then pick one album's worth from **On My iPhone → Spotify**.
 2. When the import finishes, the app lists exactly which files are now in your
    library, under **Now safe to delete**.
 3. Delete that batch from the Spotify folder in the Files app.
@@ -151,6 +151,13 @@ the disk halfway through.
 
 Re-importing is always safe: a file already in the library is recognised and
 skipped, so nothing is ever duplicated and you cannot lose your place.
+
+There is no way to hand over a whole folder in one go, and no button can reach
+into it for you. A web page cannot read a path, iOS has no folder picker for
+the web, and Safari cannot receive files from the share sheet either. Picking
+the files yourself is the only route Apple offers, so the app makes that route
+as short as it can: the picker is unfiltered, so nothing is greyed out, and iOS
+reopens it wherever you were last.
 
 ### What you are responsible for
 
