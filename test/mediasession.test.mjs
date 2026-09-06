@@ -83,13 +83,52 @@ await page.evaluate(async () => {
 });
 await page.waitForTimeout(2500);
 
+// Artwork is prepared asynchronously, so give it a moment to land.
+await page.waitForTimeout(1500);
+
 const meta = await page.evaluate(() => {
   const m = navigator.mediaSession.metadata;
-  return m ? { title: m.title, artist: m.artist, album: m.album, art: m.artwork.length } : null;
+  if (!m) return null;
+  return {
+    title: m.title,
+    artist: m.artist,
+    album: m.album,
+    art: [...m.artwork].map((a) => ({ sizes: a.sizes, type: a.type, src: a.src.slice(0, 5) })),
+  };
 });
-check('lock screen shows the track', meta && meta.title === 'First Light', JSON.stringify(meta));
+log('  ' + JSON.stringify(meta && meta.art));
+check('lock screen shows the track', meta && meta.title === 'First Light', JSON.stringify(meta && meta.title));
 check('lock screen shows the artist', meta && meta.artist === 'Aurora Fields');
-check('lock screen has artwork', meta && meta.art > 0);
+check('lock screen shows the album', meta && meta.album === 'Daybreak');
+
+// iOS picks a cover per surface and takes the declared size literally, so a
+// single entry, or a wrong one, is how the Dynamic Island ends up blank.
+const sizes = meta ? meta.art.map((a) => a.sizes) : [];
+check('several artwork sizes are offered', sizes.length >= 3, JSON.stringify(sizes));
+check('the small size for the Dynamic Island is there', sizes.includes('96x96'), JSON.stringify(sizes));
+check('a mid size is there', sizes.includes('192x192'), JSON.stringify(sizes));
+check('a large size is there', sizes.includes('512x512'), JSON.stringify(sizes));
+check('the real cover is used, not the app icon',
+  meta && meta.art.every((a) => a.src === 'blob:'), JSON.stringify(meta && meta.art.map((a) => a.src)));
+
+// The declared size must match the actual pixels, or iOS drops the artwork.
+const honest = await page.evaluate(async () => {
+  const m = navigator.mediaSession.metadata;
+  const out = [];
+  for (const entry of m.artwork) {
+    const dims = await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img.naturalWidth + 'x' + img.naturalHeight);
+      img.onerror = () => resolve('failed');
+      img.src = entry.src;
+    });
+    out.push({ declared: entry.sizes, actual: dims });
+  }
+  return out;
+});
+log('  ' + JSON.stringify(honest));
+check('every declared size is the truth',
+  honest.every((e) => e.declared === e.actual), JSON.stringify(honest));
 
 const afterPlay = await page.evaluate(() =>
   window.__actions.filter((a) => a.kind === 'function').map((a) => a.action));

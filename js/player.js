@@ -16,6 +16,7 @@
  */
 
 import * as db from './db.js';
+import { mediaArtwork } from './ui.js';
 
 export const REPEAT = { OFF: 'off', ALL: 'all', ONE: 'one' };
 
@@ -814,26 +815,27 @@ class Player extends EventTarget {
     if (!('mediaSession' in navigator) || !this.current) return;
     const t = this.current;
 
-    const art = [];
-    if (t.artworkKey) {
-      const blob = await db.getArtwork(t.artworkKey);
-      if (blob) {
-        if (this._artUrl) URL.revokeObjectURL(this._artUrl);
-        this._artUrl = URL.createObjectURL(blob);
-        art.push({ src: this._artUrl, sizes: '512x512', type: blob.type || 'image/jpeg' });
-      }
-    }
-    if (!art.length) art.push({ src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' });
+    // Write the text straight away. Preparing artwork takes a moment, and the
+    // Dynamic Island showing the previous track meanwhile is worse than it
+    // showing this one without a cover for an instant.
+    const write = (artwork) => {
+      if (this.current !== t) return; // the track moved on while we worked
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: t.title || 'Unknown title',
+          artist: t.artist || 'Unknown artist',
+          album: t.album || '',
+          artwork,
+        });
+      } catch { /* older WebKit */ }
+    };
 
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: t.title || 'Unknown title',
-        artist: t.artist || 'Unknown artist',
-        album: t.album || '',
-        artwork: art,
-      });
-    } catch { /* older WebKit */ }
+    write([
+      { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ]);
 
+    write(await mediaArtwork(t.artworkKey));
   }
 
   /* --------------------------------------------------------- persistence */

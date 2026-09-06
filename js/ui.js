@@ -272,6 +272,89 @@ export function toast(message, { detail = '', error = false, duration = 3600 } =
   }, duration);
 }
 
+/* ------------------------------------------------- lock screen artwork */
+
+const mediaArtCache = new Map(); // key -> [{ src, sizes, type }]
+const MEDIA_ART_SIZES = [96, 192, 512];
+const MEDIA_ART_CACHE_LIMIT = 12;
+
+/**
+ * Cover art prepared for the Lock Screen, Control Centre and Dynamic Island.
+ *
+ * iOS is fussy here in two ways. It wants a choice of sizes so it can pick one
+ * per surface, and it takes the declared `sizes` at its word, so handing it a
+ * 1400px scan labelled 512x512 gets the artwork dropped rather than scaled.
+ * Embedded covers are also often megabytes, which is far more than any of
+ * these surfaces needs. So each cover is redrawn at a few honest sizes once
+ * and kept.
+ */
+export async function mediaArtwork(key) {
+  if (!key) return fallbackArtwork();
+  if (mediaArtCache.has(key)) return mediaArtCache.get(key);
+
+  const url = await artworkUrl(key);
+  if (!url) return fallbackArtwork();
+
+  try {
+    const image = await loadImage(url);
+    const variants = [];
+
+    for (const size of MEDIA_ART_SIZES) {
+      const blob = await renderSquare(image, size);
+      if (!blob) continue;
+      variants.push({
+        src: URL.createObjectURL(blob),
+        sizes: size + 'x' + size,
+        type: blob.type || 'image/jpeg',
+      });
+    }
+
+    if (!variants.length) return fallbackArtwork();
+    rememberMediaArt(key, variants);
+    return variants;
+  } catch {
+    return fallbackArtwork();
+  }
+}
+
+function fallbackArtwork() {
+  return [
+    { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+  ];
+}
+
+/** Draw the cover square at `size`, cropping to centre rather than squashing. */
+function renderSquare(image, size) {
+  return new Promise((resolve) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      const source = Math.min(image.naturalWidth || size, image.naturalHeight || size);
+      const sx = ((image.naturalWidth || size) - source) / 2;
+      const sy = ((image.naturalHeight || size) - source) / 2;
+      ctx.drawImage(image, sx, sy, source, source, 0, 0, size, size);
+
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.86);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/** Keep a handful of covers ready and revoke the URLs of the rest. */
+function rememberMediaArt(key, variants) {
+  mediaArtCache.set(key, variants);
+  while (mediaArtCache.size > MEDIA_ART_CACHE_LIMIT) {
+    const oldest = mediaArtCache.keys().next().value;
+    for (const variant of mediaArtCache.get(oldest)) URL.revokeObjectURL(variant.src);
+    mediaArtCache.delete(oldest);
+  }
+}
+
 /* -------------------------------------------------------- colour extraction */
 
 const colourCache = new Map();
