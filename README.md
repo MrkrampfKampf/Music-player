@@ -47,23 +47,33 @@ everything by touching the equipment in front of you:
 | Headphones | Liked songs |
 | Guitar | Shuffles everything, and the strings ring |
 
-The room is a real space rather than a picture of one: walls, a floor and every
-object are planes standing in a perspective projection, so they hide each other,
-take the lamp according to the way they face, and slide against one another as
-you tilt the phone. The camera walks up to whatever you touch instead of a panel
-opening over it.
+The room is rendered, not drawn. It is a small control room built out of real
+geometry in metres, with physically based materials, warm practical fixtures
+and soft shadows: sawn oak, open-cell acoustic foam, woven grille cloth,
+brushed alloy, painted plaster, wool. Nothing is a picture of a thing. The
+camera walks up to whatever you touch instead of a panel opening over it.
+
+Every material is made rather than downloaded. Colour, roughness and normal
+maps are drawn into canvases at load time from value noise, so the whole studio
+adds nothing to the download beyond the renderer and still has grain that
+wanders, a weave that drifts, and plaster that is blotchy.
 
 The equipment is the interface, not a skin on one. The tonearm's angle is the
 playhead and you drag it to move through a track. The console's five faders are
-the equaliser and they really travel. The knob beside them is the crossfade and
+the equaliser and they really travel; the knob beside them is the crossfade and
 it really turns. The capo chip clamped to the guitar's neck walks down it as the
 track plays, and is the only progress indicator anywhere in the room.
 
-One lamp lights it, dust drifts in the beam, the deck turns and the meters move
-while something plays, and the standby lamps breathe when nothing does. Every
-object names itself when you touch or focus it, all of them are reachable by
-keyboard, and there is a light switch by the door that lists the same places in
-words for anyone in a hurry.
+One lamp over the desk and two washing the wall light it, LED strips glow under
+the worktop and the bridge, a candle gutters, the deck turns and the meters
+swing while something plays, and the standby lamps breathe when nothing does.
+
+Interaction is a layer of transparent buttons tracking each object's projected
+outline, one per object and one per control, so the room is reachable by finger,
+by tab key and by a screen reader — which a bare canvas never is. There is also
+a light switch by the door that lists the same places in words, for anyone in a
+hurry. A device that cannot give us WebGL gets the drawn room instead, which has
+the same objects and the same routes.
 
 This plays records you own, so it is built out of the objects that implies
 rather than out of cards and sliders.
@@ -322,6 +332,7 @@ index.html            app shell
 manifest.webmanifest  Home Screen metadata
 sw.js                 service worker, caches the shell for offline use
 css/styles.css        design system
+css/room.css          the room: canvas, and the buttons that track the objects
 js/
   main.js             bootstrap and routing
   db.js               IndexedDB: tracks, media blobs, artwork, playlists
@@ -335,6 +346,11 @@ js/
   nowplaying.js       full screen player
   addview.js          the Add tab
   settings.js         preferences and the Settings screen
+  room.js             the room: what a touch does, and what moves while it runs
+  room2d.js           the drawn room, for a device without WebGL
+  studio/scene.js     the studio itself: geometry, materials, lights, camera
+  studio/textures.js  the materials, drawn into canvases at load time
+vendor/three/         the renderer (three.js, MIT), vendored so it works offline
 server/               the optional converter service
 test/                 metadata parser tests
 ```

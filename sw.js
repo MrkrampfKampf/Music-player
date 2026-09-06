@@ -6,7 +6,7 @@
  * not subject to cache eviction the same way.
  */
 
-const VERSION = 'resonate-v6';
+const VERSION = 'resonate-v7';
 const SHELL = [
   './',
   './index.html',
@@ -29,6 +29,21 @@ const SHELL = [
   './js/discover.js',
   './js/discoverview.js',
   './js/room.js',
+  './js/room2d.js',
+  './js/studio/scene.js',
+  './js/studio/textures.js',
+  './vendor/three/three.module.js',
+  './vendor/three/environments/RoomEnvironment.js',
+  './vendor/three/postprocessing/EffectComposer.js',
+  './vendor/three/postprocessing/RenderPass.js',
+  './vendor/three/postprocessing/ShaderPass.js',
+  './vendor/three/postprocessing/MaskPass.js',
+  './vendor/three/postprocessing/Pass.js',
+  './vendor/three/postprocessing/UnrealBloomPass.js',
+  './vendor/three/postprocessing/OutputPass.js',
+  './vendor/three/shaders/CopyShader.js',
+  './vendor/three/shaders/LuminosityHighPassShader.js',
+  './vendor/three/shaders/OutputShader.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-180.png',

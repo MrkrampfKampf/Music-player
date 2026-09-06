@@ -1,9 +1,14 @@
 /**
  * The room.
  *
- * Home is the studio, so its objects are the navigation and have to work as
- * such: reachable by keyboard, routed somewhere real, and alive while music
- * plays. Nothing here is decoration.
+ * Home is a rendered studio and its equipment is the navigation, so the tests
+ * are about the equipment: every object reachable by finger and by keyboard,
+ * routed somewhere real, its own controls working as controls, and the room
+ * alive while music plays. Nothing here is decoration.
+ *
+ * The renderer needs a GPU, so this asks headless Chromium for its software
+ * one. A device without WebGL falls back to the drawn room, which is covered
+ * at the end.
  *
  *   node test/room.test.mjs http://127.0.0.1:8099
  */
@@ -20,12 +25,16 @@ const { files, cleanup } = makeFixtures();
 async function inRoom(page) {
   if (!(await page.isVisible('[data-view="home"]'))) {
     await page.locator('[data-back]:visible').first().click();
-    await page.waitForTimeout(450);
+    await page.waitForTimeout(700);
   }
-  await page.waitForSelector('.room .obj', { timeout: 8000 });
+  await page.waitForSelector('.room .obj', { timeout: 9000 });
+  await page.waitForTimeout(350);
 }
 
-const browser = await chromium.launch({ args:['--autoplay-policy=no-user-gesture-required'] });
+const roomState = (page) => page.evaluate(async () => (await import('./js/room.js')).roomState());
+
+const GL = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+const browser = await chromium.launch({ args:['--autoplay-policy=no-user-gesture-required', ...GL] });
 const page = await browser.newPage({ viewport:{width:393,height:852}, deviceScaleFactor:2 });
 const errors=[]; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 await page.goto(BASE + '/index.html',{waitUntil:'networkidle'});
@@ -33,7 +42,10 @@ await page.waitForTimeout(900);
 await page.setInputFiles('#file-input', files);
 await page.waitForTimeout(6500);
 await page.locator('[data-back]:visible').first().click();
-await page.waitForTimeout(1200);
+await page.waitForTimeout(3000);
+
+const boot = await roomState(page);
+check('the studio is rendered', boot.ready && boot.webgl, JSON.stringify(boot));
 
 const objs = await page.evaluate(() => [...document.querySelectorAll('.room .obj')].map(o => o.dataset.go));
 check('the room has working objects', objs.length >= 7, JSON.stringify(objs));
@@ -49,13 +61,11 @@ check('the speakers start the music', await page.evaluate(async()=> (await impor
 await page.waitForTimeout(1200);
 
 // The room moves with the audio.
-const moved = await page.evaluate(() => {
-  const a = document.querySelector('.room .platter').style.transform;
-  return new Promise(r => setTimeout(() => r(a !== document.querySelector('.room .platter').style.transform), 400));
-});
-check('the deck turns while it plays', moved);
-const vu = await page.evaluate(() => document.querySelector('.room .needle').style.transform);
-check('the meters move', /rotate/.test(vu), vu);
+const spinA = (await roomState(page)).platter;
+await page.waitForTimeout(700);
+const spinB = await roomState(page);
+check('the deck turns while it plays', spinB.platter > spinA, spinA + ' -> ' + spinB.platter);
+check('the meters move', spinB.meter > 0.05, String(spinB.meter));
 
 // The crate walks you to the library.
 await inRoom(page);
@@ -87,7 +97,7 @@ check('the guitar shuffles everything', await page.evaluate(async()=>{
 
 // The objects are the interface, so their own parts have to work.
 await inRoom(page);
-const fader = page.locator('.room [data-band="0"]');
+const fader = page.locator('.room .ctl[data-band="0"]');
 const before = await page.evaluate(async () => (await import('./js/settings.js')).settings.eqGains[0]);
 const fb = await fader.boundingBox();
 await page.mouse.move(fb.x + fb.width / 2, fb.y + fb.height / 2);
@@ -106,30 +116,28 @@ await page.evaluate(async () => {
   if (!player.current) await player.play(library.songs, 0);
   else if (!player.playing) await player.play(player.queue, player.index);
 });
-await page.waitForTimeout(1500);
-const read = () => page.evaluate(() => ({
-  arm: document.querySelector('.room [data-arm]').style.getPropertyValue('--a'),
-  chip: document.querySelector('.room [data-chip]').style.getPropertyValue('--t'),
-}));
-const t1 = await read();
-await page.waitForTimeout(1800);
-const t2 = await read();
-check('the tonearm tracks the playhead', t1.arm !== t2.arm, JSON.stringify([t1.arm, t2.arm]));
-check('the capo chip walks down the neck', t1.chip !== t2.chip, JSON.stringify([t1.chip, t2.chip]));
+await page.waitForTimeout(1600);
+const t1 = await roomState(page);
+await page.waitForTimeout(2000);
+const t2 = await roomState(page);
+check('the tonearm tracks the playhead', t2.arm !== t1.arm, JSON.stringify([t1.arm, t2.arm]));
+check('the capo chip walks down the neck', t2.capo !== t1.capo, JSON.stringify([t1.capo, t2.capo]));
 
 // The camera walks to whatever you touch, then comes back.
 await inRoom(page);
-// The commanded camera, not the interpolated one: headless Chromium does not
-// always tick a composited transition, but the command is what we set.
-const camAt = () => page.evaluate(() => document.querySelector('.world').style.transform);
-const still = await camAt();
+const still = (await roomState(page)).camera;
 await page.locator('.room .obj[data-go="library"]').click();
-await page.waitForTimeout(120);
-const walking = await camAt();
-check('the camera moves toward what you touched', walking !== still, walking);
-await page.waitForTimeout(900);
+await page.waitForTimeout(420);
+const walking = (await roomState(page)).camera;
+const shifted = walking.some((v, i) => Math.abs(v - still[i]) > 0.02);
+check('the camera walks toward what you touched', shifted, JSON.stringify([still, walking]));
+await page.waitForTimeout(1200);
 await page.locator('[data-back]:visible').first().click();
-await page.waitForTimeout(900);
+await page.waitForTimeout(1200);
+await inRoom(page);
+const back = (await roomState(page)).camera;
+check('and comes back to where it stands', back.every((v, i) => Math.abs(v - still[i]) < 0.02),
+  JSON.stringify(back));
 
 // The light switch by the door is the way through for anyone in a hurry.
 await inRoom(page);
@@ -141,6 +149,30 @@ await page.waitForTimeout(700);
 check('and it gets you there', await page.isVisible('[data-view="settings"]'));
 await page.locator('[data-back]:visible').first().click();
 await page.waitForTimeout(700);
+
+// A device with no WebGL still gets a room.
+const plain = await browser.newPage({ viewport:{width:393,height:852} });
+await plain.addInitScript(() => {
+  const real = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
+    if (String(kind).startsWith('webgl')) return null;
+    return real.call(this, kind, ...rest);
+  };
+});
+await plain.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
+await plain.waitForTimeout(900);
+await plain.setInputFiles('#file-input', files);
+await plain.waitForTimeout(6500);
+await plain.locator('[data-back]:visible').first().click();
+await plain.waitForTimeout(1500);
+const drawn = await plain.evaluate(async () => ({
+  objects: document.querySelectorAll('.room .obj').length,
+  drawn: !!document.querySelector('.room .stage .world'),
+  webgl: (await import('./js/room.js')).roomState().webgl,
+}));
+check('without WebGL the drawn room takes over',
+  drawn.drawn && !drawn.webgl && drawn.objects >= 7, JSON.stringify(drawn));
+await plain.close();
 
 log(''); log('errors: '+errors.length);
 for (const e of [...new Set(errors)].slice(0,5)) log('  '+e);

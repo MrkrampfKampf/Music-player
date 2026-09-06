@@ -13,7 +13,7 @@ import { settings, loadSettings, saveSettings, renderSettings, applyTheme } from
 import { initNowPlaying, isPlayerOpen, closePlayer } from './nowplaying.js';
 import { renderHome, renderLibrary, renderSearch, renderDetail, setRouter } from './views.js';
 import { renderDiscover, resetDiscover } from './discoverview.js';
-import { setRoomRouter } from './room.js';
+import { setRoomRouter, prepareRoom } from './room.js';
 import { initAdd, renderAdd, importPickedFiles } from './addview.js';
 import { closeSheet, isSheetOpen, toast } from './ui.js';
 import { asButton, press } from './tactile.js';
@@ -82,6 +82,9 @@ function render() {
 }
 
 setRouter(navigate);
+
+// The studio takes a moment to build, so start it before it is asked for.
+prepareRoom();
 
 // The room's objects route by name.
 setRoomRouter((where) => {

@@ -422,7 +422,7 @@ export async function renderHome(host) {
   // Home is the room. Nothing is laid on top of it: what is playing shows on
   // the deck, the position shows on the guitar's capo chip, and everywhere
   // else in the app is something you can walk up to and touch.
-  host.append(renderRoom(el('div', {})));
+  await renderRoom(host);
 }
 
 function emptyState({ icon: iconName, title, body, action }) {
