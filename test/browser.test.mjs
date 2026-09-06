@@ -191,6 +191,33 @@ check('lyrics pane opens', await page.isVisible('#np-lyrics'));
 await page.click('#np-lyrics-btn');
 await page.waitForTimeout(300);
 
+/* ------------------------------------------------- safe-to-delete listing */
+console.log('Telling the user what is safe to delete');
+{
+  // The player is still open from the transport checks and covers the tab bar.
+  await page.evaluate(() => {
+    document.getElementById('np').hidden = true;
+    document.body.style.overflow = '';
+  });
+  await page.click('[data-nav="add"]');
+  await page.waitForTimeout(500);
+  await page.setInputFiles('#file-input', files);
+  await page.waitForTimeout(5000);
+
+  const panel = await page.locator('#safe-to-delete').count();
+  check('the safe-to-delete panel appears', panel === 1, String(panel));
+
+  const named = await page.evaluate(() =>
+    [...document.querySelectorAll('#safe-to-delete .safe-file')].map((r) => r.textContent));
+  check('every imported file is named', named.length === 5, JSON.stringify(named));
+  check('the names are the real filenames',
+    named.length > 0 && named.every((n) => n.endsWith('.wav')), JSON.stringify(named));
+
+  await page.click('#safe-to-delete button');
+  await page.waitForTimeout(300);
+  check('the panel dismisses', (await page.locator('#safe-to-delete').count()) === 0);
+}
+
 /* ------------------------------------------------------------- re-import */
 console.log('Re-importing the same folder');
 {

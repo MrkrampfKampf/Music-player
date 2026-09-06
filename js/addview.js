@@ -10,9 +10,12 @@ import { library } from './library.js';
 import { Converter, ConverterError, normaliseUrl, isSpotify, QUALITY } from './converter.js';
 import { settings, saveSettings } from './settings.js';
 import { el, icon, clear, artNode, toast, formatBytes, menuSheet, closeSheet, plural } from './ui.js';
+import * as db from './db.js';
 
 let converter = null;
 let jobs = [];
+/** The last import, kept so its summary survives a re-render of this view. */
+let lastImport = null;
 
 export function initAdd() {
   converter = new Converter(settings);
@@ -101,6 +104,8 @@ export function renderAdd(host) {
 
   host.append(serverStatusCard());
   host.append(jobsSection());
+  const safe = safeToDeleteSection();
+  if (safe) host.append(safe);
 }
 
 function serverStatusCard() {
@@ -323,8 +328,67 @@ function confirmPlaylist(resolved, count) {
 
 /* ------------------------------------------------------------ file import */
 
+/**
+ * Warn before an import that will not fit.
+ *
+ * Importing copies each file into the app's own storage, because Safari gives
+ * a web app no way to keep playing a file that stays where it is. On a phone
+ * that is nearly full that matters, and finding out halfway through an import
+ * is the worst way to learn it.
+ *
+ * @returns {Promise<boolean>} whether to go ahead
+ */
+async function confirmSpace(files) {
+  const needed = [...files].reduce((sum, f) => sum + (f.size || 0), 0);
+  const estimate = await db.storageEstimate();
+  if (!estimate || !estimate.quota) return true;
+
+  const free = Math.max(0, estimate.quota - estimate.usage);
+  if (needed < free * 0.9) return true;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    menuSheet(null, [], el('div', {},
+      el('h2', { text: 'This may not fit' }),
+      el('div', { class: 'card-box', style: { marginBottom: '14px' } },
+        el('div', { class: 'setting' },
+          el('div', { class: 'setting-text' }, el('b', { text: 'These files' })),
+          el('div', { class: 'setting-value', text: formatBytes(needed) })),
+        el('div', { class: 'setting' },
+          el('div', { class: 'setting-text' }, el('b', { text: 'Room left' })),
+          el('div', { class: 'setting-value', text: formatBytes(free) }))),
+      el('p', {
+        text: 'Importing copies each file into the app, so for a while a song '
+          + 'takes up space twice. Import a few albums at a time and delete each '
+          + 'batch from its old folder once it is here, and you never need room '
+          + 'for two full copies.',
+        style: { color: 'var(--text-dim)', margin: '0 0 18px', lineHeight: '1.5' },
+      }),
+      el('button', {
+        class: 'btn wide',
+        text: 'Import anyway',
+        onclick: () => { settled = true; closeSheet(); resolve(true); },
+      }),
+      el('button', {
+        class: 'btn wide secondary',
+        text: 'Cancel',
+        style: { marginTop: '10px' },
+        onclick: () => { settled = true; closeSheet(); resolve(false); },
+      })));
+
+    const host = document.getElementById('sheet-host');
+    const observer = new MutationObserver(() => {
+      if (!host.hidden) return;
+      observer.disconnect();
+      if (!settled) { settled = true; resolve(false); }
+    });
+    observer.observe(host, { attributes: true, attributeFilter: ['hidden'] });
+  });
+}
+
 export async function importPickedFiles(files) {
   if (!files || !files.length) return;
+  if (!await confirmSpace(files)) return;
 
   const job = addJob(plural(files.length, 'file'));
   updateJob(job, { status: 'Reading tags' });
@@ -355,6 +419,9 @@ export async function importPickedFiles(files) {
     title: plural(files.length, 'file'),
   });
 
+  lastImport = (result.added.length || dupes) ? result : null;
+  if (lastImport) repaintSafeToDelete();
+
   if (result.added.length) {
     const notes = [];
     if (dupes) notes.push(dupes + ' were already in your library.');
@@ -370,4 +437,76 @@ export async function importPickedFiles(files) {
       error: true,
     });
   }
+}
+
+/**
+ * List the files that are now definitely in the library.
+ *
+ * Freeing space means deleting the originals, and doing that from memory is
+ * how people lose music. This names each file that made it, and separately
+ * names any that did not, so the decision needs no guessing.
+ *
+ * Built from stored state rather than appended to the DOM, because importing
+ * re-renders this view.
+ */
+function safeToDeleteSection() {
+  if (!lastImport) return null;
+
+  const safe = [
+    ...lastImport.added.map((t) => t.fileName || t.title),
+    ...lastImport.duplicates,
+  ].sort((a, b) => a.localeCompare(b));
+  if (!safe.length) return null;
+
+  const list = el('div', {
+    style: {
+      maxHeight: '220px', overflowY: 'auto', marginTop: '10px',
+      borderTop: '1px solid var(--line)', paddingTop: '10px',
+    },
+  });
+  for (const name of safe) {
+    list.append(el('div', {
+      class: 'safe-file',
+      text: name,
+      style: {
+        fontSize: '13px', color: 'var(--text-dim)', padding: '4px 0',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      },
+    }));
+  }
+
+  const failedCount = lastImport.failed.length;
+
+  return el('section', { id: 'safe-to-delete' },
+    el('h2', { class: 'section-title', text: 'Now safe to delete' }),
+    el('div', { class: 'convert-card' },
+      el('p', {
+        text: plural(safe.length, 'file') + ' from that import are in your library now. '
+          + 'You can delete these from wherever they came from, and the copy here keeps working.',
+        style: { margin: '0', fontSize: '13.5px', color: 'var(--text-dim)', lineHeight: '1.5' },
+      }),
+      failedCount ? el('p', {
+        text: 'Keep the other ' + plural(failedCount, 'file') + '. Those could not be read.',
+        style: { margin: '10px 0 0', fontSize: '13.5px', color: 'var(--danger)', lineHeight: '1.5' },
+      }) : null,
+      list,
+      el('button', {
+        class: 'btn secondary wide',
+        text: 'Done',
+        style: { marginTop: '12px' },
+        onclick: () => { lastImport = null; repaintSafeToDelete(); },
+      })));
+}
+
+function repaintSafeToDelete() {
+  const host = document.getElementById('add-body');
+  if (!host) return;
+  const existing = host.querySelector('#safe-to-delete');
+  const next = safeToDeleteSection();
+
+  if (existing && next) existing.replaceWith(next);
+  else if (existing) existing.remove();
+  else if (next) host.append(next);
+
+  if (next) next.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }

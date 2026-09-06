@@ -126,15 +126,31 @@ converter can do with a Spotify link is read its **track list** and then find
 each song from a source that is not encrypted. Matches are usually right but
 are not guaranteed to be the same master.
 
-**Sharing a folder with Spotify is not possible either.** Every iOS app is
-sealed in its own container that no other app can read, and Spotify's downloads
-live inside that container as encrypted files rather than as songs on disk.
-There is no Spotify folder to point at, and no app, native or otherwise, can
-reach one.
+**Music you added to Spotify yourself is a different matter.** Spotify's Local
+Files on iOS live in an ordinary folder you can open: **Files → On My iPhone →
+Spotify**. Those are your own files sitting on disk, so you can import them
+here. It is only Spotify's *streamed* downloads, the ones from its catalogue,
+that are encrypted and out of reach.
 
-The one place iOS does let apps share is the **Files** app. Keep your music in
-a folder there, in iCloud Drive or On My iPhone, and import it here whenever
-you add something. Re-importing the same folder only picks up what is new.
+### Moving a library across without needing double the space
+
+Safari gives a web app no way to play a file that stays where it is, so
+importing copies it. On a full phone that matters, and the way through is to
+move rather than duplicate:
+
+1. In the app, tap **Add → Choose files** and pick one album's worth from
+   **On My iPhone → Spotify**.
+2. When the import finishes, the app lists exactly which files are now in your
+   library, under **Now safe to delete**.
+3. Delete that batch from the Spotify folder in the Files app.
+4. Repeat.
+
+You never need room for two full copies, only for one batch at a time. If a
+selection will not fit, the app says so before it starts rather than filling
+the disk halfway through.
+
+Re-importing is always safe: a file already in the library is recognised and
+skipped, so nothing is ever duplicated and you cannot lose your place.
 
 ### What you are responsible for
 
