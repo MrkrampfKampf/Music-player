@@ -138,16 +138,21 @@ Safari gives a web app no way to play a file that stays where it is, so
 importing copies it. On a full phone that matters, and the way through is to
 move rather than duplicate:
 
-1. In the app, tap **Add → From my Spotify folder**, which spells out the
-   route, then pick one album's worth from **On My iPhone → Spotify**.
-2. When the import finishes, the app lists exactly which files are now in your
-   library, under **Now safe to delete**.
+1. In the app, tap **Add → From my Spotify folder**, then select as much as you
+   like from **On My iPhone → Spotify**. Selecting everything is fine.
+2. The import takes them one at a time and stops when the room runs out. It
+   then lists exactly which files made it, under **Now safe to delete**.
 3. Delete that batch from the Spotify folder in the Files app.
-4. Repeat.
+4. Tap **Pick the rest** and choose the same files again. Everything already
+   imported is skipped, so it carries on from where it stopped.
 
-You never need room for two full copies, only for one batch at a time. If a
-selection will not fit, the app says so before it starts rather than filling
-the disk halfway through.
+Repeat until it stops saying it ran out. You never need room for two full
+copies, only for one batch at a time, and no round ever redoes work from the
+last one.
+
+The app cannot delete the originals for you. A web page gets read-only access
+to the files you hand it and has no way to change anything on disk, so step 3
+is yours.
 
 Re-importing is always safe: a file already in the library is recognised and
 skipped, so nothing is ever duplicated and you cannot lose your place.
@@ -243,8 +248,10 @@ and checks the library survives a reload. It needs Playwright:
 npx http-server -p 8099 -c-1 .
 node test/browser.test.mjs http://127.0.0.1:8099
 node test/offline.test.mjs http://127.0.0.1:8099
+node test/quota.test.mjs http://127.0.0.1:8099
 ```
 
-The second one cuts the network entirely and checks the app still starts,
+The offline one cuts the network entirely and checks the app still starts,
 because a service worker that quietly fails to register looks completely
-normal until you have no signal.
+normal until you have no signal. The quota one fills the storage mid-import
+and checks it stops cleanly and resumes.

@@ -33,3 +33,4 @@ jobs:
           npx --yes wait-on http://127.0.0.1:8099/index.html
           node test/browser.test.mjs http://127.0.0.1:8099
           node test/offline.test.mjs http://127.0.0.1:8099
+          node test/quota.test.mjs http://127.0.0.1:8099

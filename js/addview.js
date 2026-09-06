@@ -334,12 +334,13 @@ function confirmPlaylist(resolved, count) {
 /* ------------------------------------------------------------ file import */
 
 /**
- * Warn before an import that will not fit.
+ * Tell the user, before a large import starts, that it will be taken in
+ * rounds rather than all at once.
  *
- * Importing copies each file into the app's own storage, because Safari gives
- * a web app no way to keep playing a file that stays where it is. On a phone
- * that is nearly full that matters, and finding out halfway through an import
- * is the worst way to learn it.
+ * Importing copies each file, because Safari gives a web app no way to play
+ * one that stays where it is. Selecting a whole library therefore rarely fits.
+ * The import takes as many as it can and stops cleanly, so this sheet sets
+ * that expectation instead of letting it look like a failure.
  *
  * @returns {Promise<boolean>} whether to go ahead
  */
@@ -351,27 +352,30 @@ async function confirmSpace(files) {
   const free = Math.max(0, estimate.quota - estimate.usage);
   if (needed < free * 0.9) return true;
 
+  const fits = Math.max(1, Math.floor((free / Math.max(1, needed)) * [...files].length));
+
   return new Promise((resolve) => {
     let settled = false;
     menuSheet(null, [], el('div', {},
-      el('h2', { text: 'This may not fit' }),
+      el('h2', { text: 'More than fits right now' }),
       el('div', { class: 'card-box', style: { marginBottom: '14px' } },
         el('div', { class: 'setting' },
-          el('div', { class: 'setting-text' }, el('b', { text: 'These files' })),
+          el('div', { class: 'setting-text' }, el('b', { text: 'You picked' })),
           el('div', { class: 'setting-value', text: formatBytes(needed) })),
         el('div', { class: 'setting' },
           el('div', { class: 'setting-text' }, el('b', { text: 'Room left' })),
           el('div', { class: 'setting-value', text: formatBytes(free) }))),
       el('p', {
-        text: 'Importing copies each file into the app, so for a while a song '
-          + 'takes up space twice. Import a few albums at a time and delete each '
-          + 'batch from its old folder once it is here, and you never need room '
-          + 'for two full copies.',
+        text: 'That is fine. The import takes them one at a time and stops when '
+          + 'the room runs out, roughly ' + fits + ' of them. It then lists exactly '
+          + 'what made it, so you can delete those originals and tap again to carry '
+          + 'on. Files already here are skipped, so each round picks up where the '
+          + 'last one stopped.',
         style: { color: 'var(--text-dim)', margin: '0 0 18px', lineHeight: '1.5' },
       }),
       el('button', {
         class: 'btn wide',
-        text: 'Import anyway',
+        text: 'Import what fits',
         onclick: () => { settled = true; closeSheet(); resolve(true); },
       }),
       el('button', {
@@ -408,9 +412,11 @@ export async function importPickedFiles(files) {
   });
 
   const dupes = result.duplicates.length;
+  const left = result.notAttempted.length;
   const parts = [];
   if (result.added.length) parts.push(plural(result.added.length, 'song') + ' added');
   if (dupes) parts.push(dupes + ' already here');
+  if (result.stoppedForSpace && left) parts.push(left + ' left, out of room');
   if (result.failed.length) parts.push(result.failed.length + ' failed');
   if (result.skipped) parts.push(result.skipped + ' unsupported');
 
@@ -427,7 +433,13 @@ export async function importPickedFiles(files) {
   lastImport = (result.added.length || dupes) ? result : null;
   if (lastImport) repaintSafeToDelete();
 
-  if (result.added.length) {
+  if (result.stoppedForSpace) {
+    toast('Room ran out', {
+      detail: plural(result.added.length, 'song') + ' made it. Delete those from their old '
+        + 'folder, then pick the same files again to carry on.',
+      duration: 9000,
+    });
+  } else if (result.added.length) {
     const notes = [];
     if (dupes) notes.push(dupes + ' were already in your library.');
     if (result.failed.length) notes.push(result.failed.length + ' could not be read.');
@@ -482,6 +494,8 @@ function safeToDeleteSection() {
 
   const failedCount = lastImport.failed.length;
 
+  const left = lastImport.notAttempted.length;
+
   return el('section', { id: 'safe-to-delete' },
     el('h2', { class: 'section-title', text: 'Now safe to delete' }),
     el('div', { class: 'convert-card' },
@@ -490,15 +504,26 @@ function safeToDeleteSection() {
           + 'You can delete these from wherever they came from, and the copy here keeps working.',
         style: { margin: '0', fontSize: '13.5px', color: 'var(--text-dim)', lineHeight: '1.5' },
       }),
+      lastImport.stoppedForSpace && left ? el('p', {
+        text: 'Room ran out with ' + plural(left, 'file') + ' still to go. Delete the ones '
+          + 'below, then pick the same files again and the import carries on from there.',
+        style: { margin: '10px 0 0', fontSize: '13.5px', color: 'var(--text)', lineHeight: '1.5', fontWeight: '600' },
+      }) : null,
       failedCount ? el('p', {
         text: 'Keep the other ' + plural(failedCount, 'file') + '. Those could not be read.',
         style: { margin: '10px 0 0', fontSize: '13.5px', color: 'var(--danger)', lineHeight: '1.5' },
       }) : null,
       list,
+      lastImport.stoppedForSpace && left ? el('button', {
+        class: 'btn wide',
+        text: 'Pick the rest',
+        style: { marginTop: '12px' },
+        onclick: () => document.getElementById('file-input').click(),
+      }) : null,
       el('button', {
         class: 'btn secondary wide',
         text: 'Done',
-        style: { marginTop: '12px' },
+        style: { marginTop: '10px' },
         onclick: () => { lastImport = null; repaintSafeToDelete(); },
       })));
 }

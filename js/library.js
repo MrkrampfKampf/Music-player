@@ -48,8 +48,16 @@ class Library extends EventTarget {
   /* --------------------------------------------------------------- import */
 
   /**
-   * Import files the user picked. Reports progress per file and never lets one
-   * bad file abort the batch.
+   * Import files the user picked, one at a time, taking as many as will fit.
+   *
+   * Selecting a whole library at once is the natural thing to do, and it will
+   * usually not fit, because importing copies each file. Rather than refusing
+   * the lot, this takes them in order until the space runs out and then stops
+   * cleanly, reporting what made it. Deleting those originals frees room, and
+   * running it again on the same selection carries on from where it stopped,
+   * since files already here are skipped. A library moves across in rounds
+   * without ever needing space for two full copies.
+   *
    * @param {File[]} files
    * @param {(done:number,total:number,name:string)=>void} onProgress
    */
@@ -59,15 +67,47 @@ class Library extends EventTarget {
     const added = [];
     const failed = [];
     const duplicates = [];
+    let stoppedForSpace = false;
+    let stoppedAt = accepted.length;
+
+    // Track the space left locally: re-measuring per file is slow, and the
+    // browser's own figure lags behind writes anyway.
+    let remaining = await freeSpace();
 
     for (let i = 0; i < accepted.length; i++) {
       const file = accepted[i];
+
+      // Re-measure now and then so the running total cannot drift far.
+      if (remaining != null && i > 0 && i % 8 === 0) {
+        const measured = await freeSpace();
+        if (measured != null) remaining = measured;
+      }
+
+      if (remaining != null && file.size > remaining - SPACE_HEADROOM) {
+        stoppedForSpace = true;
+        stoppedAt = i;
+        break;
+      }
+
       if (onProgress) onProgress(i, accepted.length, file.name);
+
       try {
         const track = await this.importFile(file);
-        if (track) added.push(track);
-        else duplicates.push(file.name);
+        if (track) {
+          added.push(track);
+          if (remaining != null) remaining -= file.size;
+        } else {
+          duplicates.push(file.name);
+        }
       } catch (err) {
+        if (isQuotaError(err)) {
+          // The browser is the authority on space, whatever the estimate said.
+          console.warn('Out of room while importing ' + file.name);
+          stoppedForSpace = true;
+          stoppedAt = i;
+          await db.pruneArtwork().catch(() => {});
+          break;
+        }
         console.warn('Import failed for ' + file.name, err);
         failed.push(file.name);
       }
@@ -75,7 +115,15 @@ class Library extends EventTarget {
 
     if (onProgress) onProgress(accepted.length, accepted.length, '');
     await this.load();
-    return { added, failed, skipped, duplicates };
+
+    return {
+      added,
+      failed,
+      skipped,
+      duplicates,
+      stoppedForSpace,
+      notAttempted: accepted.slice(stoppedAt).map((f) => f.name),
+    };
   }
 
   /**
@@ -446,6 +494,22 @@ class Library extends EventTarget {
 }
 
 /* -------------------------------------------------------------- utilities */
+
+/** Leave a little room so the app itself is not wedged by a full quota. */
+const SPACE_HEADROOM = 8 * 1024 * 1024;
+
+async function freeSpace() {
+  const estimate = await db.storageEstimate();
+  if (!estimate || !estimate.quota) return null;
+  return Math.max(0, estimate.quota - estimate.usage);
+}
+
+function isQuotaError(err) {
+  if (!err) return false;
+  return err.name === 'QuotaExceededError'
+    || err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    || /quota/i.test(err.message || '');
+}
 
 function isPlayable(file) {
   const name = file.name || '';
