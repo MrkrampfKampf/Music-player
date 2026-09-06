@@ -7,9 +7,9 @@ import { player, EQ_BANDS, EQ_PRESETS } from './player.js';
 import { library } from './library.js';
 import {
   el, icon, clear, toast, formatBytes, menuSheet, confirmSheet, promptSheet,
-  bindRangePaint, paintRange, plural,
+  plural, knob,
 } from './ui.js';
-import { configureTactile, flip, tick, asButton } from './tactile.js';
+import { configureTactile, flip, tick } from './tactile.js';
 
 export const settings = {
   theme: 'dark',
@@ -98,22 +98,7 @@ async function playbackGroup() {
     toggleRow('Resume on launch', 'Pick up where you left off when the app opens.',
       settings.resumeOnLaunch, async (on) => { settings.resumeOnLaunch = on; await saveSettings(); }),
 
-    valueRow('Crossfade', 'Blend the end of one song into the next.',
-      settings.crossfade ? settings.crossfade + 's' : 'Off',
-      () => menuSheet('Crossfade', [0, 2, 3, 5, 8, 12].map((seconds) => ({
-        label: seconds ? seconds + ' seconds' : 'Off',
-        icon: 'speed',
-        checked: settings.crossfade === seconds,
-        onSelect: async () => {
-          settings.crossfade = seconds;
-          player.setCrossfade(seconds);
-          await saveSettings();
-          renderSettings(document.getElementById('settings-body'));
-          if (seconds) {
-            toast('Crossfade on', { detail: 'This routes audio through the mixer, which resamples. Turn it off for bit-perfect playback.', duration: 6000 });
-          }
-        },
-      })))),
+    crossfadeKnob(),
 
     valueRow('Sleep timer', 'Fade out and pause after a while.',
       sleepLabel(),
@@ -145,6 +130,34 @@ async function playbackGroup() {
           },
         },
       ])));
+}
+
+/** Crossfade as a knob: fully left is off, and it reads without a tap. */
+function crossfadeKnob() {
+  const dial = knob({
+    min: 0,
+    max: 12,
+    step: 1,
+    value: settings.crossfade,
+    format: (v) => (v ? v + 's' : 'OFF'),
+    onInput: (v) => { settings.crossfade = v; player.setCrossfade(v); },
+    onCommit: async (v) => {
+      await saveSettings();
+      if (v) {
+        toast('Crossfade on', {
+          detail: 'This routes audio through the mixer, which resamples. Turn it back to zero for bit-perfect playback.',
+          duration: 6000,
+        });
+      }
+    },
+  });
+
+  return el('div', { class: 'knob-row' },
+    el('div', { class: 'setting-text' },
+      el('b', { text: 'Crossfade' }),
+      el('span', { text: 'Blend the end of one song into the next. Turn it up, or leave it at zero.' })),
+    dial.readout,
+    dial.node);
 }
 
 function sleepLabel() {
@@ -248,21 +261,21 @@ function eqSliders(host) {
 
   wrap.append(bands);
 
-  const preamp = el('input', {
-    type: 'range', min: '-12', max: '12', step: '0.5',
-    value: String(settings.preamp), 'aria-label': 'Preamp',
+  const gain = knob({
+    min: -12,
+    max: 12,
+    step: 0.5,
+    value: settings.preamp,
+    format: (v) => fmtGain(v) + ' dB',
+    onInput: (v) => { settings.preamp = v; player.setPreamp(v); },
+    onCommit: saveSettings,
   });
-  const preampValue = el('span', { class: 'setting-value', text: fmtGain(settings.preamp) + ' dB' });
-  bindRangePaint(preamp);
-  preamp.addEventListener('input', () => {
-    settings.preamp = Number(preamp.value);
-    preampValue.textContent = fmtGain(settings.preamp) + ' dB';
-    player.setPreamp(settings.preamp);
-    paintRange(preamp);
-  });
-  preamp.addEventListener('change', saveSettings);
 
-  wrap.append(el('div', { class: 'desk-row' }, el('b', { text: 'Gain' }), preamp, preampValue));
+  wrap.append(el('div', { class: 'desk-row' },
+    el('b', { text: 'Gain' }),
+    el('span', { style: { flex: '1' } }),
+    gain.readout,
+    gain.node));
 
   wrap.append(el('button', {
     class: 'btn secondary wide',

@@ -83,7 +83,7 @@ check('songs listed', (await page.locator('[data-view="library"] .row').count())
 
 await page.click('#library-tabs [data-tab="albums"]');
 await page.waitForTimeout(400);
-check('album grid', (await page.locator('[data-view="library"] .grid .card').count()) === 2);
+check('albums stand in a crate', (await page.locator('[data-view="library"] .crate .card').count()) === 2);
 
 await page.click('#library-tabs [data-tab="artists"]');
 await page.waitForTimeout(400);
@@ -92,7 +92,7 @@ check('artist grid', (await page.locator('[data-view="library"] .grid .card').co
 /* ------------------------------------------------------------ album detail */
 await page.click('#library-tabs [data-tab="albums"]');
 await page.waitForTimeout(400);
-await page.locator('[data-view="library"] .grid .card').first().click();
+await page.locator('[data-view="library"] .crate .card.front').click();
 await page.waitForTimeout(700);
 check('album detail opened', await page.isVisible('[data-view="detail"] .detail-hero'));
 const albumTitle = await page.textContent('.detail-title');

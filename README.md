@@ -46,7 +46,14 @@ leaders running out to the time. The **equaliser** is a mixing desk whose
 fader caps you read as a curve rather than as ten numbers. **Settings** is the
 faceplate of an amplifier, with switches that throw and labels screen-printed
 in the metal. The **tab bar** is the row of buttons along the bottom of a
-hi-fi, with a small lamp above the one that is engaged.
+hi-fi, with a small lamp above the one that is engaged. Albums stand in a
+**crate** you push through with a thumb, leaning back behind the one at the
+front. **Crossfade and gain are amp knobs** that turn under your finger and
+detent as they go.
+
+None of that is at the expense of finding things. Every control is labelled,
+the transport keys are where transport keys go, search is a search field, and
+the deck says "drag the arm to move" the first time you touch it.
 
 Square corners, light from above, and one fixed brass accent throughout. The
 record on the platter tints the lamp over the deck, but it never repaints the
@@ -106,6 +113,26 @@ to protect your library in Settings → Storage so it is not cleared when space
 runs low.
 
 ---
+
+## Finding music online
+
+**Search → Find Online** searches the Internet Archive's audio collections:
+live recordings, netlabel releases and public domain music. No account and no
+key, and everything it offers can be downloaded and played offline.
+
+Each result shows its licence, and each track shows the format the source
+actually holds, labelled honestly:
+
+| Shown as | What it is |
+|---|---|
+| Hi-Res FLAC 24/96 | Lossless above CD, at the stated depth and rate |
+| FLAC lossless | Lossless at CD quality |
+| MP3 320, MP3 VBR | Compressed, at the stated rate |
+
+Where a release carries the same track in several encodings, the best one is
+the one offered. Nothing is ever labelled better than the file behind it, and
+anything the archive marks restricted is shown but not offered for download.
+Downloads land in the same library as everything else.
 
 ## Adding music from a link
 

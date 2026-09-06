@@ -4,7 +4,7 @@
  */
 
 import * as db from './db.js';
-import { press } from './tactile.js';
+import { press, tick } from './tactile.js';
 
 /* ------------------------------------------------------------------ markup */
 
@@ -534,4 +534,82 @@ export function makeSortable(list, { handleSelector = '.drag-handle', onReorder 
     handle.addEventListener('pointerup', onUp);
     handle.addEventListener('pointercancel', onUp);
   });
+}
+
+/* ---------------------------------------------------------------- knobs */
+
+/**
+ * An amplifier knob. Drag it round, or up and down, and it turns.
+ *
+ * It sweeps 280 degrees, which is what a real potentiometer does, and it
+ * detents at every step so the travel has grain under the finger. The pointer
+ * line means the setting is readable without touching it.
+ *
+ * @param {{min,max,step,value,format,onInput,onCommit}} spec
+ */
+export function knob({ min = 0, max = 10, step = 1, value = 0, format = String, onInput, onCommit }) {
+  const SWEEP = 280;
+  const node = el('div', { class: 'knob', role: 'slider', tabindex: '0',
+    'aria-valuemin': String(min), 'aria-valuemax': String(max) });
+  const body = el('div', { class: 'body' });
+  node.append(el('div', { class: 'scale' }), body, el('div', { class: 'cap' }));
+
+  const readout = el('span', { class: 'knob-value' });
+  let current = value;
+
+  const paint = () => {
+    const fraction = (current - min) / (max - min || 1);
+    body.style.setProperty('--turn', (-SWEEP / 2 + fraction * SWEEP).toFixed(1) + 'deg');
+    readout.textContent = format(current);
+    node.setAttribute('aria-valuenow', String(current));
+    node.setAttribute('aria-valuetext', format(current));
+  };
+
+  const setValue = (next, notify) => {
+    const clamped = Math.min(max, Math.max(min, Math.round(next / step) * step));
+    if (clamped === current) return;
+    current = clamped;
+    paint();
+    tick();
+    if (notify && onInput) onInput(current);
+  };
+
+  let dragging = false;
+  let startY = 0;
+  let startValue = 0;
+
+  node.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    startY = event.clientY;
+    startValue = current;
+    node.classList.add('turning');
+    node.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  node.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    // Up increases, which is how anyone expects a knob on a screen to behave.
+    const travel = (startY - event.clientY) / 140;
+    setValue(startValue + travel * (max - min), true);
+  });
+
+  const finish = () => {
+    if (!dragging) return;
+    dragging = false;
+    node.classList.remove('turning');
+    if (onCommit) onCommit(current);
+  };
+  node.addEventListener('pointerup', finish);
+  node.addEventListener('pointercancel', finish);
+
+  node.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowRight') { setValue(current + step, true); event.preventDefault(); }
+    else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') { setValue(current - step, true); event.preventDefault(); }
+    else return;
+    if (onCommit) onCommit(current);
+  });
+
+  paint();
+  return { node, readout, get value() { return current; } };
 }

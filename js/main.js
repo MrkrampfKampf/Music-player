@@ -12,6 +12,7 @@ import { player } from './player.js';
 import { settings, loadSettings, saveSettings, renderSettings, applyTheme } from './settings.js';
 import { initNowPlaying, isPlayerOpen, closePlayer } from './nowplaying.js';
 import { renderHome, renderLibrary, renderSearch, renderDetail, setRouter } from './views.js';
+import { renderDiscover, resetDiscover } from './discoverview.js';
 import { initAdd, renderAdd, importPickedFiles } from './addview.js';
 import { closeSheet, isSheetOpen, toast } from './ui.js';
 import { asButton, press } from './tactile.js';
@@ -20,6 +21,7 @@ const state = {
   view: 'home',
   libraryTab: 'songs',
   query: '',
+  searchScope: 'library',
   detail: null,
 };
 
@@ -123,6 +125,15 @@ function wireChrome() {
   document.querySelector('[data-action="open-settings"]').addEventListener('click', () => navigate({ view: 'settings' }));
   document.querySelector('[data-action="import"]').addEventListener('click', () => document.getElementById('file-input').click());
 
+  for (const tab of document.querySelectorAll('#search-tabs [data-scope]')) {
+    tab.addEventListener('click', () => {
+      press();
+      state.searchScope = tab.dataset.scope;
+      if (state.searchScope === 'online') resetDiscover();
+      render();
+    });
+  }
+
   const search = document.getElementById('search-input');
   const clearBtn = document.getElementById('search-clear');
   let searchTimer = null;
@@ -131,14 +142,19 @@ function wireChrome() {
     clearBtn.hidden = !search.value;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      if (state.view === 'search') renderSearch(document.getElementById('search-body'), state.query);
-    }, 130);
+      if (state.view !== 'search') return;
+      const body = document.getElementById('search-body');
+      // Online searching hits the network, so it waits a little longer.
+      if (state.searchScope === 'online') renderDiscover(body, state.query);
+      else renderSearch(body, state.query);
+    }, state.searchScope === 'online' ? 450 : 130);
   });
   clearBtn.addEventListener('click', () => {
     search.value = '';
     state.query = '';
     clearBtn.hidden = true;
-    renderSearch(document.getElementById('search-body'), '');
+    if (state.searchScope === 'online') resetDiscover();
+    render();
     search.focus();
   });
 

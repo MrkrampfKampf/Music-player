@@ -10,6 +10,7 @@ import {
   el, icon, clear, artNode, formatTime, formatDurationLong, plural,
   isHiRes, menuSheet, promptSheet, confirmSheet, closeSheet, toast, artworkUrl,
 } from './ui.js';
+import { tick, press } from './tactile.js';
 
 let router = null;
 export function setRouter(fn) { router = fn; }
@@ -532,7 +533,7 @@ export function renderLibrary(host, tab) {
   }
 
   if (tab === 'albums') {
-    host.append(el('div', { class: 'grid' }, library.albums.map(albumCard)));
+    host.append(crate(library.albums));
     return;
   }
 
@@ -596,6 +597,133 @@ function countFooter(tracks) {
     text: plural(tracks.length, 'song') + ' · ' + formatDurationLong(total),
     style: { textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px', padding: '20px 0 6px' },
   });
+}
+
+/**
+ * A crate of records you push through with a thumb.
+ *
+ * The one at the front stands upright and names itself; the rest lean back
+ * behind it and go dark, so depth does the work a grid would do with size.
+ * Dragging moves the stack, and each sleeve that passes gives a tick, which
+ * is what flipping through a real crate feels like.
+ */
+function crate(albums) {
+  const wrap = el('div', { class: 'crate-wrap' });
+  const box = el('div', { class: 'crate' });
+  wrap.append(box);
+  if (!albums.length) return wrap;
+
+  let index = 0;
+  let offset = 0;   // fractional position while a drag is in flight
+
+  const cards = albums.map((album) => {
+    const card = el('button', { class: 'card', 'aria-label': album.name + ', ' + album.artist },
+      artNode(album.artworkKey));
+    box.append(card);
+    return card;
+  });
+
+  // The name belongs on the divider in front of the crate, not printed across
+  // the sleeves, so it lives outside the box.
+  const count = el('span', { class: 'crate-count silk' });
+  box.append(count);
+
+  const title = el('div', { class: 'crate-title' });
+  const artist = el('div', { class: 'crate-artist silk' });
+  wrap.append(el('div', { class: 'crate-caption' }, title, artist));
+
+  const layout = () => {
+    const position = index + offset;
+    cards.forEach((card, i) => {
+      const d = i - position;              // sleeves ahead are positive
+      const behind = Math.max(0, d);
+      const visible = d > -1.4 && d < 7;
+
+      card.hidden = !visible;
+      if (!visible) return;
+
+      // Each one further back sits deeper, higher and leaning away.
+      const z = -behind * 52;
+      const y = -behind * 7;
+      const x = d < 0 ? d * 240 : behind * 9;
+      const rotateY = d < 0 ? -46 : -7 - behind * 1.6;
+      const rotateX = 4 + behind * 0.7;
+
+      card.style.transform =
+        'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,' + z.toFixed(1) + 'px)'
+        + ' rotateY(' + rotateY.toFixed(1) + 'deg) rotateX(' + rotateX.toFixed(1) + 'deg)';
+      card.style.opacity = d < -0.6 ? '0' : '1';
+      card.style.filter = 'brightness(' + Math.max(0.32, 1 - behind * 0.16).toFixed(2) + ')';
+      card.style.zIndex = String(50 - Math.round(behind));
+      card.classList.toggle('front', Math.round(position) === i);
+    });
+
+    const at = Math.min(albums.length - 1, Math.max(0, Math.round(position)));
+    count.textContent = (at + 1) + ' of ' + albums.length;
+    title.textContent = albums[at].name;
+    artist.textContent = albums[at].artist;
+  };
+
+  cards.forEach((card, i) => {
+    card.addEventListener('click', () => {
+      if (dragged > 8) return;             // that was a flip, not a tap
+      if (i !== index) {
+        index = i;
+        layout();
+        tick();
+        return;
+      }
+      press();
+      router({ view: 'album', key: albums[i].key });
+    });
+  });
+
+  /* ------------------------------------------------------------- flipping */
+
+  let startX = 0;
+  let dragged = 0;
+  let flipping = false;
+  let lastStep = 0;
+  const STEP = 62;                          // pixels per sleeve
+
+  box.addEventListener('pointerdown', (event) => {
+    flipping = true;
+    dragged = 0;
+    lastStep = 0;
+    startX = event.clientX;
+    box.classList.add('dragging');
+  });
+
+  box.addEventListener('pointermove', (event) => {
+    if (!flipping) return;
+    const dx = event.clientX - startX;
+    dragged = Math.max(dragged, Math.abs(dx));
+    // Capture only once this is really a flip. Capturing on pointerdown
+    // retargets the click to the crate, and a plain tap stops opening.
+    if (dragged > 6 && !box.hasPointerCapture(event.pointerId)) {
+      box.setPointerCapture(event.pointerId);
+    }
+    offset = Math.max(-index, Math.min(albums.length - 1 - index, -dx / STEP));
+
+    const step = Math.round(offset);
+    if (step !== lastStep) { lastStep = step; tick(); }
+    layout();
+  });
+
+  const drop = () => {
+    if (!flipping) return;
+    flipping = false;
+    box.classList.remove('dragging');
+    index = Math.min(albums.length - 1, Math.max(0, Math.round(index + offset)));
+    offset = 0;
+    layout();
+  };
+
+  box.addEventListener('pointerup', drop);
+  box.addEventListener('pointercancel', drop);
+
+  layout();
+  return wrap;
 }
 
 /* ------------------------------------------------------------------ search */
