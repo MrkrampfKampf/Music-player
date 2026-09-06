@@ -163,6 +163,13 @@ export class Converter {
       album: meta.album || '',
     });
 
+    if (!track) {
+      throw new ConverterError(
+        'That one is already in your library.',
+        'The downloaded file matches a track you already have, so nothing was added.',
+      );
+    }
+
     // The remote thumbnail is better than nothing when the file has no art.
     if (track && !track.artworkKey && item.thumbnail) {
       try {

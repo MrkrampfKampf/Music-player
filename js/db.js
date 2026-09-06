@@ -15,7 +15,7 @@
  */
 
 const DB_NAME = 'resonate';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -35,6 +35,14 @@ function open() {
         tracks.createIndex('addedAt', 'addedAt');
         tracks.createIndex('liked', 'liked');
         tracks.createIndex('kind', 'kind');
+        tracks.createIndex('fingerprint', 'fingerprint');
+      } else if (event.oldVersion < 2 && tx) {
+        // Version 2 added the fingerprint used to spot a re-imported file.
+        // Tracks imported before it simply have none and never match.
+        const tracks = tx.objectStore('tracks');
+        if (!tracks.indexNames.contains('fingerprint')) {
+          tracks.createIndex('fingerprint', 'fingerprint');
+        }
       }
       if (!db.objectStoreNames.contains('blobs')) {
         db.createObjectStore('blobs');
@@ -132,6 +140,14 @@ export async function countTracks() {
   return wrap(t.objectStore('tracks').count());
 }
 
+/** The existing track with this fingerprint, if the file was imported before. */
+export async function findByFingerprint(fingerprint) {
+  if (!fingerprint) return null;
+  const t = await tx(['tracks'], 'readonly');
+  const found = await wrap(t.objectStore('tracks').index('fingerprint').get(fingerprint));
+  return found || null;
+}
+
 /** Delete a track along with its media, lyrics, play history and playlist refs. */
 export async function deleteTrack(id) {
   const t = await tx(['tracks', 'blobs', 'lyrics', 'plays', 'playlists'], 'readwrite');
@@ -212,6 +228,29 @@ export async function pruneArtwork() {
   const keys = await wrap(store.getAllKeys());
   for (const key of keys) if (!live.has(key)) store.delete(key);
   await done(t);
+}
+
+/**
+ * A cheap identity for a media file: its size plus a hash of the first and
+ * last 64 KB. Enough to recognise the same file on a repeat import without
+ * reading a 400 MB album off disk to do it.
+ */
+export async function fileFingerprint(file) {
+  try {
+    const edge = 64 * 1024;
+    const head = await file.slice(0, Math.min(edge, file.size)).arrayBuffer();
+    const tail = file.size > edge
+      ? await file.slice(Math.max(0, file.size - edge), file.size).arrayBuffer()
+      : new ArrayBuffer(0);
+
+    const merged = new Uint8Array(head.byteLength + tail.byteLength);
+    merged.set(new Uint8Array(head), 0);
+    merged.set(new Uint8Array(tail), head.byteLength);
+
+    return file.size + '-' + await hashBytes(merged.buffer);
+  } catch {
+    return '';
+  }
 }
 
 async function hashBytes(buf) {

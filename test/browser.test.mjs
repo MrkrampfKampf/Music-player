@@ -191,6 +191,43 @@ check('lyrics pane opens', await page.isVisible('#np-lyrics'));
 await page.click('#np-lyrics-btn');
 await page.waitForTimeout(300);
 
+/* ------------------------------------------------------------- re-import */
+console.log('Re-importing the same folder');
+{
+  const before = await page.evaluate(async () => {
+    const { library } = await import('./js/library.js');
+    return library.tracks.length;
+  });
+
+  await page.setInputFiles('#file-input', files);
+  await page.waitForTimeout(5000);
+
+  const after = await page.evaluate(async () => {
+    const { library } = await import('./js/library.js');
+    return library.tracks.length;
+  });
+  check('re-importing adds no duplicates', after === before, before + ' -> ' + after);
+
+  // A genuinely new file still gets in.
+  const extra = makeOneOff();
+  await page.setInputFiles('#file-input', [extra.path]);
+  await page.waitForTimeout(3500);
+  const grown = await page.evaluate(async () => {
+    const { library } = await import('./js/library.js');
+    return { n: library.tracks.length, has: library.tracks.some((t) => t.title === 'One Off') };
+  });
+  check('a new file is still imported', grown.n === before + 1 && grown.has, JSON.stringify(grown));
+  extra.cleanup();
+
+  // Clean up so the counts below match what the rest of the test expects.
+  await page.evaluate(async () => {
+    const { library } = await import('./js/library.js');
+    const t = library.tracks.find((x) => x.title === 'One Off');
+    if (t) await library.deleteTracks([t.id]);
+  });
+  await page.waitForTimeout(800);
+}
+
 /* -------------------------------------------------------------- playlists */
 console.log('Playlists');
 await page.evaluate(async () => {
@@ -315,6 +352,16 @@ function makeFixtures() {
 
   files.sort();
   return { files, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+/** A single extra track, distinct from the album fixtures. */
+function makeOneOff() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'resonate-oneoff-'));
+  const target = path.join(dir, '01 One Off.wav');
+  fs.writeFileSync(target, makeWav(261.63, 4, {
+    TIT2: 'One Off', TPE1: 'Nobody', TALB: 'Loose Ends', TRCK: '1/1',
+  }, makePng(60, [120, 220, 140])));
+  return { path: target, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
 function makePng(size, [r, g, b]) {

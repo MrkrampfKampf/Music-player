@@ -85,6 +85,39 @@ fine from a free host. YouTube mostly does not, because every free host runs on
 datacentre addresses that YouTube now blocks on sight. The server README covers
 what helps.
 
+### Using the phone itself, no server at all
+
+Your phone has an ordinary home internet address, which is exactly what a
+rented server does not, so this is the one approach YouTube does not block. It
+takes one free app and a couple of minutes of setup.
+
+1. Install **a-Shell** from the App Store. It is a free terminal that includes
+   Python, and it needs no jailbreak or account.
+2. Open it and run:
+
+   ```
+   pip install -U yt-dlp
+   ```
+
+3. To fetch a track, run this with your link in place of the URL:
+
+   ```
+   yt-dlp -x --audio-format m4a -o "~/Documents/%(title)s.%(ext)s" "URL"
+   ```
+
+   `-x` keeps only the audio. Using `m4a` avoids re-encoding on most sources,
+   so the quality is whatever the source already was.
+
+4. The file lands in the Files app under **On My iPhone → a-Shell**.
+5. In this app, tap **Add → Choose files** and pick it.
+
+Re-running the import on the same folder later is safe: files already in your
+library are recognised and skipped, so you only ever get the new ones.
+
+Keep yt-dlp current with `pip install -U yt-dlp` when a link stops working.
+Sites change how they serve media often, and a stale extractor is the usual
+cause.
+
 ### About Spotify
 
 Spotify audio is DRM encrypted. It cannot be converted to MP3 by this app or by
@@ -92,6 +125,16 @@ any other tool, and that is a technical wall rather than a policy one. What the
 converter can do with a Spotify link is read its **track list** and then find
 each song from a source that is not encrypted. Matches are usually right but
 are not guaranteed to be the same master.
+
+**Sharing a folder with Spotify is not possible either.** Every iOS app is
+sealed in its own container that no other app can read, and Spotify's downloads
+live inside that container as encrypted files rather than as songs on disk.
+There is no Spotify folder to point at, and no app, native or otherwise, can
+reach one.
+
+The one place iOS does let apps share is the **Files** app. Keep your music in
+a folder there, in iCloud Drive or On My iPhone, and import it here whenever
+you add something. Re-importing the same folder only picks up what is new.
 
 ### What you are responsible for
 
@@ -167,7 +210,7 @@ test/                 metadata parser tests
 
 ```sh
 node test/tags.test.mjs      # 68 assertions over the metadata parser
-cd server && npm test        # 34 assertions over the converter server
+cd server && npm test        # 42 assertions over the converter server
 ```
 
 The app itself has a browser test that imports real tagged audio, plays it,

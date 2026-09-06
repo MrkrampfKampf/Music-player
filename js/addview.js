@@ -338,21 +338,31 @@ export async function importPickedFiles(files) {
     });
   });
 
+  const dupes = result.duplicates.length;
   const parts = [];
   if (result.added.length) parts.push(plural(result.added.length, 'song') + ' added');
+  if (dupes) parts.push(dupes + ' already here');
   if (result.failed.length) parts.push(result.failed.length + ' failed');
-  if (result.skipped) parts.push(result.skipped + ' skipped');
+  if (result.skipped) parts.push(result.skipped + ' unsupported');
+
+  // Nothing new from a folder you already imported is a success, not a failure.
+  const worked = result.added.length > 0 || dupes > 0;
 
   updateJob(job, {
-    state: result.added.length ? 'done' : 'failed',
+    state: worked ? 'done' : 'failed',
     status: parts.join(' · ') || 'Nothing to import',
     progress: 1,
     title: plural(files.length, 'file'),
   });
 
   if (result.added.length) {
-    toast(plural(result.added.length, 'song') + ' added', {
-      detail: result.failed.length ? result.failed.length + ' could not be read.' : '',
+    const notes = [];
+    if (dupes) notes.push(dupes + ' were already in your library.');
+    if (result.failed.length) notes.push(result.failed.length + ' could not be read.');
+    toast(plural(result.added.length, 'song') + ' added', { detail: notes.join(' ') });
+  } else if (dupes) {
+    toast('Nothing new to add', {
+      detail: 'All ' + dupes + ' of those are already in your library.',
     });
   } else {
     toast('Nothing was imported', {

@@ -58,6 +58,7 @@ class Library extends EventTarget {
     const skipped = [...files].length - accepted.length;
     const added = [];
     const failed = [];
+    const duplicates = [];
 
     for (let i = 0; i < accepted.length; i++) {
       const file = accepted[i];
@@ -65,6 +66,7 @@ class Library extends EventTarget {
       try {
         const track = await this.importFile(file);
         if (track) added.push(track);
+        else duplicates.push(file.name);
       } catch (err) {
         console.warn('Import failed for ' + file.name, err);
         failed.push(file.name);
@@ -73,11 +75,24 @@ class Library extends EventTarget {
 
     if (onProgress) onProgress(accepted.length, accepted.length, '');
     await this.load();
-    return { added, failed, skipped };
+    return { added, failed, skipped, duplicates };
   }
 
-  /** Import a single File or Blob. Returns the stored track row. */
+  /**
+   * Import a single File or Blob. Returns the stored track row, or null when
+   * the same file is already in the library.
+   *
+   * Re-importing a folder is the normal way to pick up newly added music, so
+   * a file that is already here is skipped rather than duplicated. Pass
+   * `extra.allowDuplicate` to import a second copy on purpose.
+   */
   async importFile(file, extra = {}) {
+    const fingerprint = await db.fileFingerprint(file);
+    if (fingerprint && !extra.allowDuplicate) {
+      const existing = await db.findByFingerprint(fingerprint);
+      if (existing) return null;
+    }
+
     const kind = VIDEO_EXT.test(file.name || '') || (file.type || '').startsWith('video/') ? 'video' : 'audio';
     const meta = await readTags(file);
 
@@ -121,6 +136,7 @@ class Library extends EventTarget {
       bitDepth: meta.bitDepth || 0,
       artworkKey,
       liked: extra.liked ? 1 : 0,
+      fingerprint,
       source: extra.source || 'local',
       sourceUrl: extra.sourceUrl || '',
       fileName: file.name || title,
