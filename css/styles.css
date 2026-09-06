@@ -1716,8 +1716,8 @@ input[type="range"]::-moz-range-thumb { width: 13px; height: 22px; border: 0; bo
 .room {
   position: relative;
   margin: 0 -20px;
-  aspect-ratio: 392 / 448;
-  max-height: 64vh;
+  flex: 1 1 auto;
+  min-height: 260px;
   overflow: hidden;
   background: #0d0b09;
   transition: transform 0.26s var(--ease), opacity 0.26s;
@@ -1726,7 +1726,9 @@ input[type="range"]::-moz-range-thumb { width: 13px; height: 22px; border: 0; bo
 /* Walking up to something, rather than a window opening over it. */
 .room.approaching { transform: scale(1.9); opacity: 0; }
 
-.room svg { width: 100%; height: 100%; display: block; }
+/* The scene fills the room outright: left to itself an SVG keeps its own
+   aspect ratio and leaves a gap under it. */
+.room svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* A hit area larger than the drawing, so nothing needs a precise tap. */
 .obj { cursor: pointer; outline: none; }
@@ -1843,3 +1845,259 @@ input[type="range"]::-moz-range-thumb { width: 13px; height: 22px; border: 0; bo
   margin-bottom: 4px;
 }
 .view[data-view="home"] .view-head::after { display: none; }
+
+/* =========================================================================
+   MATERIALS
+
+   Everything above sets out what each part is. This last pass says what it
+   is made of: anodised aluminium takes a lengthwise brush and a hard top
+   highlight, glass takes one diagonal reflection and nothing else, wood and
+   card take grain. Every raised part gets two shadows, a tight one where it
+   meets the surface and a soft one further out, because one shadow reads as
+   a sticker. Pressing something takes the highlight away and puts an
+   occlusion into the top of the well, which is what actually happens.
+   ========================================================================= */
+
+:root {
+  /* the light along an extruded edge, and the shade under it */
+  --specular:
+    linear-gradient(180deg,
+      rgba(255, 246, 226, 0.14) 0 1px,
+      rgba(255, 246, 226, 0.05) 1px 38%,
+      rgba(0, 0, 0, 0.10) 62%,
+      rgba(0, 0, 0, 0.30) 100%);
+  /* the drawn grain of a brushed face */
+  --brushed:
+    repeating-linear-gradient(90deg,
+      rgba(255, 246, 226, 0.030) 0 1px,
+      rgba(0, 0, 0, 0.030) 1px 2px);
+  /* anodising is never even: it swings warm across the part */
+  --anodise:
+    linear-gradient(96deg,
+      rgba(255, 246, 226, 0.09),
+      rgba(255, 246, 226, 0) 34%,
+      rgba(0, 0, 0, 0.08) 64%,
+      rgba(255, 246, 226, 0.06));
+  /* one reflection, high and to the left, the way glass under a lamp behaves */
+  --glass:
+    linear-gradient(166deg,
+      rgba(255, 246, 226, 0.11) 0 20%,
+      rgba(255, 246, 226, 0.015) 20% 54%,
+      rgba(0, 0, 0, 0.18) 100%);
+  /* contact shadow, then the ambient one */
+  --lift:
+    0 1px 0 rgba(0, 0, 0, 0.62),
+    0 3px 6px rgba(0, 0, 0, 0.40),
+    0 10px 22px rgba(0, 0, 0, 0.28);
+  --seated:
+    inset 0 3px 5px rgba(0, 0, 0, 0.62),
+    inset 0 -1px 0 rgba(255, 246, 226, 0.05);
+  --grain-fine:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="light"] {
+  --specular:
+    linear-gradient(180deg,
+      rgba(255, 253, 244, 0.85) 0 1px,
+      rgba(255, 253, 244, 0.34) 1px 40%,
+      rgba(0, 0, 0, 0.04) 64%,
+      rgba(0, 0, 0, 0.13) 100%);
+  --brushed:
+    repeating-linear-gradient(90deg,
+      rgba(255, 253, 244, 0.34) 0 1px,
+      rgba(0, 0, 0, 0.026) 1px 2px);
+  --anodise:
+    linear-gradient(96deg,
+      rgba(255, 253, 244, 0.5),
+      rgba(255, 253, 244, 0) 34%,
+      rgba(0, 0, 0, 0.05) 64%,
+      rgba(255, 253, 244, 0.3));
+  --glass:
+    linear-gradient(166deg,
+      rgba(255, 255, 250, 0.6) 0 20%,
+      rgba(255, 255, 250, 0.1) 20% 54%,
+      rgba(0, 0, 0, 0.08) 100%);
+  --lift:
+    0 1px 0 rgba(90, 68, 32, 0.22),
+    0 3px 6px rgba(90, 68, 32, 0.16),
+    0 10px 22px rgba(90, 68, 32, 0.12);
+  --seated:
+    inset 0 3px 5px rgba(90, 68, 32, 0.26),
+    inset 0 -1px 0 rgba(255, 253, 244, 0.7);
+}
+
+/* --------------------------------------------------------------- alloy keys */
+
+.btn,
+.icon-btn,
+.chip,
+.tool,
+.speed-pip {
+  background-image: var(--specular), var(--brushed), var(--anodise);
+  background-blend-mode: normal, overlay, normal;
+}
+
+.btn,
+.icon-btn,
+.chip {
+  box-shadow: var(--bevel), var(--lift);
+}
+
+/* Pressed, a key loses its lit edge and the well shades it from above. */
+.btn:active, .btn.pushed,
+.icon-btn:active, .icon-btn.pushed,
+.chip:active {
+  background-image: var(--brushed);
+  box-shadow: var(--seated), inset 0 0 12px rgba(0, 0, 0, 0.45);
+}
+
+/* A brass cap is warm metal, not a flat swatch. */
+.btn.primary,
+.detail-actions .btn:first-child,
+.list-head .btn:first-child,
+.btn.danger,
+.chip.on {
+  background-image:
+    linear-gradient(180deg, rgba(255, 250, 232, 0.34) 0 1px, rgba(255, 250, 232, 0.13) 1px 34%,
+      rgba(0, 0, 0, 0.10) 62%, rgba(0, 0, 0, 0.24) 100%),
+    var(--brushed);
+}
+
+.btn.secondary,
+.btn.ghost {
+  background-image: none;
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------- turned aluminium */
+
+/* A knob is turned on a lathe, so its light runs around it, not down it. */
+.knob .cap,
+.cue-knob,
+.eq-band .cap {
+  background-image:
+    radial-gradient(circle at 34% 26%, rgba(255, 248, 228, 0.30), rgba(255, 248, 228, 0) 58%),
+    conic-gradient(from 210deg,
+      rgba(255, 248, 228, 0.16), rgba(0, 0, 0, 0.20) 22%,
+      rgba(255, 248, 228, 0.12) 46%, rgba(0, 0, 0, 0.22) 70%,
+      rgba(255, 248, 228, 0.14) 88%, rgba(0, 0, 0, 0.18));
+  box-shadow: var(--bevel), var(--lift);
+}
+
+/* ------------------------------------------------------------------- glass */
+
+/* Anything that reads out sits behind glass: one reflection, no gloss. */
+.np-counter,
+.bar,
+.mini-progress,
+.cue-track,
+.search-field {
+  position: relative;
+}
+.np-counter::after,
+.bar::after,
+.mini-progress::after,
+.cue-track::after,
+.search-field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--glass);
+}
+/* The storage gauge already carries its scale, so the reflection goes over it. */
+.storage-bar::after {
+  background-image:
+    var(--glass),
+    repeating-linear-gradient(90deg, transparent 0 5px, var(--panel) 5px 7px);
+}
+
+/* --------------------------------------------------------- card and lacquer */
+
+/* Large surfaces are printed card or lacquered wood: they hold grain. */
+/* Only the ones that are not already positioned need a corner to hang the
+   grain layer off; .mini and .queue-sheet place themselves and must not be
+   moved. */
+.eq-desk,
+.convert-card,
+.notice,
+.toast,
+.crate .card .art { position: relative; }
+
+.sheet,
+.detail-hero,
+.eq-desk,
+.convert-card,
+.notice,
+.toast,
+.mini,
+.queue-sheet,
+.crate .card .art { isolation: isolate; }
+.sheet::after,
+.detail-hero::after,
+.eq-desk::after,
+.convert-card::after,
+.notice::after,
+.toast::after,
+.mini::after,
+.queue-sheet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: var(--grain-fine);
+}
+.sheet > *,
+.detail-hero > *,
+.eq-desk > *,
+.convert-card > *,
+.notice > *,
+.toast > *,
+.mini > * { position: relative; z-index: 1; }
+
+/* Sleeves are printed and slightly dished, and they sit on something. */
+.crate .card .art {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 226, 0.1),
+    inset 0 -18px 26px rgba(0, 0, 0, 0.22),
+    var(--lift);
+}
+
+/* Sheets are lifted off the page, not pasted to it. */
+.sheet,
+.queue-sheet { box-shadow: 0 -2px 0 rgba(255, 246, 226, 0.06), 0 -24px 60px rgba(0, 0, 0, 0.6); }
+
+/* ------------------------------------------------------------------ lamps */
+
+/* An indicator is a lit thing behind a lens: it spills a little. */
+.icon-btn.on::after,
+.mini-progress i,
+.bar i,
+.storage-bar i {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .icon-btn, .chip { transition: none; }
+}
+
+/* The room is the whole home screen, so it takes whatever height is left
+   between the sign at the top and the deck strip at the bottom. */
+.view[data-view="home"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+/* ...but hidden still means hidden: this rule comes after the one that hides
+   views, so it has to say so itself. */
+.view[data-view="home"][hidden] { display: none; }
+.view[data-view="home"] > #home-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
