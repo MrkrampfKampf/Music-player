@@ -233,10 +233,12 @@ async function boot() {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch((err) => {
-      console.warn('Service worker registration failed', err);
-    });
+  // Register straight away. Waiting for the load event is the usual advice,
+  // but boot() has already awaited storage and the library by the time this
+  // runs, so that event has long since fired and the listener never ran,
+  // leaving the app with no offline support at all.
+  navigator.serviceWorker.register('sw.js').catch((err) => {
+    console.warn('Service worker registration failed', err);
   });
 }
 

@@ -6,7 +6,7 @@
  * not subject to cache eviction the same way.
  */
 
-const VERSION = 'resonate-v1';
+const VERSION = 'resonate-v2';
 const SHELL = [
   './',
   './index.html',
@@ -53,33 +53,51 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // converter traffic passes through
 
-  // Network first for navigations so a deployed update is picked up promptly.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(VERSION).then((cache) => cache.put('./index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('./index.html').then((hit) => hit || caches.match('./'))),
-    );
-    return;
+  event.respondWith(networkFirst(request));
+});
+
+/**
+ * Serve from the network when there is one, fall back to the cache when there
+ * is not.
+ *
+ * The shell is a handful of small files, so going to the network first costs
+ * almost nothing online and means a new version is live the next time the app
+ * opens, rather than the time after that. A slow connection does not stall the
+ * app: after a short wait the cached copy is served instead.
+ */
+async function networkFirst(request) {
+  const cached = await caches.match(request);
+
+  try {
+    const response = await withTimeout(fetch(request), 3000, cached);
+    if (response && response.ok) {
+      const copy = response.clone();
+      caches.open(VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+    }
+    if (response) return response;
+  } catch {
+    // Offline, or the request failed. The cache is the fallback below.
   }
 
-  // Cache first for the shell, refreshing in the background.
-  event.respondWith(
-    caches.match(request).then((hit) => {
-      const network = fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(VERSION).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => hit);
-      return hit || network;
-    }),
-  );
-});
+  if (cached) return cached;
+  if (request.mode === 'navigate') {
+    const shell = await caches.match('./index.html');
+    if (shell) return shell;
+  }
+  return Response.error();
+}
+
+/**
+ * Resolve `promise`, or give up after `ms` and return `fallback` instead.
+ * The request itself is left running so its result still reaches the cache.
+ */
+function withTimeout(promise, ms, fallback) {
+  if (!fallback) return promise;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}

@@ -235,4 +235,9 @@ and checks the library survives a reload. It needs Playwright:
 ```sh
 npx http-server -p 8099 -c-1 .
 node test/browser.test.mjs http://127.0.0.1:8099
+node test/offline.test.mjs http://127.0.0.1:8099
 ```
+
+The second one cuts the network entirely and checks the app still starts,
+because a service worker that quietly fails to register looks completely
+normal until you have no signal.
