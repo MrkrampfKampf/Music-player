@@ -7,6 +7,7 @@
  */
 
 import { player, REPEAT } from './player.js';
+import { repaintRoom } from './room.js';
 import { library } from './library.js';
 import * as db from './db.js';
 import { activeLineIndex } from './lyrics.js';
@@ -167,6 +168,9 @@ export function openPlayer() {
     requestAnimationFrame(() => np.classList.remove('opening'));
   });
   document.body.style.overflow = 'hidden';
+  // You are down at the deck now. The room is still there, but it is behind a
+  // screen-filling player, so it stops being drawn until you stand up again.
+  document.body.classList.add('at-deck');
   history.pushState({ player: true }, '');
 }
 
@@ -176,6 +180,8 @@ export function closePlayer() {
   open = false;
   np.classList.add('closing');
   document.body.style.overflow = '';
+  document.body.classList.remove('at-deck');
+  repaintRoom(3);
   $('queue-sheet').hidden = true;
   setTimeout(() => {
     np.hidden = true;

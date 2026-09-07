@@ -13,7 +13,7 @@ import { settings, loadSettings, saveSettings, renderSettings, applyTheme } from
 import { initNowPlaying, isPlayerOpen, closePlayer } from './nowplaying.js';
 import { renderHome, renderLibrary, renderSearch, renderDetail, setRouter } from './views.js';
 import { renderDiscover, resetDiscover } from './discoverview.js';
-import { setRoomRouter, prepareRoom } from './room.js';
+import { setRoomRouter, prepareRoom, mountRoom, focusRoom } from './room.js';
 import { initAdd, renderAdd, importPickedFiles } from './addview.js';
 import { closeSheet, isSheetOpen, toast } from './ui.js';
 import { asButton, press } from './tactile.js';
@@ -51,9 +51,12 @@ function render() {
   for (const section of document.querySelectorAll('.view')) {
     section.hidden = section.dataset.view !== state.view;
   }
-  // In the room the equipment reports what is playing, so the player bar
-  // stays out of it.
+  // The room is always there. Which piece of equipment you are standing at is
+  // what changes, and the panel below it is what that piece has to say.
   document.body.classList.toggle('in-room', state.view === 'home');
+  document.body.dataset.at = state.view === 'detail' && state.detail
+    ? state.detail.view : state.view;
+  focusRoom(state.view === 'detail' && state.detail ? state.detail.view : state.view);
 
   const main = document.getElementById('main');
 
@@ -83,8 +86,13 @@ function render() {
 
 setRouter(navigate);
 
-// The studio takes a moment to build, so start it before it is asked for.
-prepareRoom();
+// The studio is built once, into the shell, and every screen happens inside
+// it. Nothing takes it down. Building it is a couple of hundred milliseconds
+// of geometry and materials, so it waits for the browser to be idle: reading
+// the library and painting the first screen come first.
+const buildStudioSoon = () => mountRoom(document.getElementById('room-host'));
+if (typeof requestIdleCallback === 'function') requestIdleCallback(buildStudioSoon, { timeout: 1200 });
+else setTimeout(buildStudioSoon, 300);
 
 // The room's objects route by name.
 setRoomRouter((where) => {

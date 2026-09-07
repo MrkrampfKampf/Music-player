@@ -6,7 +6,7 @@
  * not subject to cache eviction the same way.
  */
 
-const VERSION = 'resonate-v8';
+const VERSION = 'resonate-v9';
 const SHELL = [
   './',
   './index.html',

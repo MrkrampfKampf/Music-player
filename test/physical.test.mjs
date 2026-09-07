@@ -34,7 +34,10 @@ await page.evaluate(async () => {
   await player.play(library.songs, 0);
 });
 await page.waitForTimeout(2200);
-await page.click('#mini');
+// The player bar is gone; what is left of #mini is the keyboard route to the
+// player, so open it the way a keyboard would.
+await page.focus('#mini');
+await page.keyboard.press('Enter');
 await page.waitForTimeout(1400);
 
 const rot = () => page.evaluate(() => {
@@ -110,12 +113,21 @@ await page.evaluate(async () => {
   closePlayer();
   const { renderSettings } = await import('./js/settings.js');
   for (const v of document.querySelectorAll('.view')) v.hidden = v.dataset.view !== 'settings';
+  // Put the shell in the state the router would leave it in: out of the room
+  // and standing at the console. Without this the panel is still the
+  // click-through home layer and nothing on it can be touched.
+  document.body.classList.remove('in-room');
+  document.body.dataset.at = 'settings';
   await renderSettings(document.getElementById('settings-body'));
 });
 await page.waitForTimeout(700);
 const eqSwitch = page.locator('[data-view="settings"] .setting', { hasText: 'Equaliser' }).locator('.switch');
 if (await eqSwitch.count()) { await eqSwitch.first().click(); await page.waitForTimeout(600); }
 
+// The panel is the lower part of the screen now, so the desk has to be
+// scrolled to before a finger can reach it.
+await page.locator('.eq-band .slot').first().scrollIntoViewIfNeeded();
+await page.waitForTimeout(400);
 const slotBox = await page.locator('.eq-band .slot').first().boundingBox();
 const inputBox = await page.locator('.eq-band input').first().boundingBox();
 check('a fader covers the whole of its slot',

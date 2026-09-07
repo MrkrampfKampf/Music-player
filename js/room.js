@@ -32,6 +32,37 @@ let detach = [];
 let fallback = null;
 let lastDrag = 0;
 
+/**
+ * Whether the room is worth drawing at all.
+ *
+ * It is not when the app is in the background, and it is not while you are
+ * down at the deck: the player fills the screen, so every frame drawn behind
+ * it is a frame spent on something nobody can see.
+ */
+function covered() {
+  return document.hidden || document.body.classList.contains('at-deck');
+}
+
+/**
+ * A finger on the screen owns the frame.
+ *
+ * While something is being dragged — the tonearm on the player, a fader on the
+ * console — the drag has to feel like the thing is stuck to the finger, and
+ * that only happens if the pointer events are handled the moment they arrive.
+ * So the room holds still for the length of a drag, unless the drag is of
+ * something in the room, which asks for its own redraws as it moves.
+ */
+let handsOn = false;
+document.addEventListener('pointerdown', () => { handsOn = true; }, true);
+for (const type of ['pointerup', 'pointercancel']) {
+  document.addEventListener(type, () => { handsOn = false; repaintRoom(1); }, true);
+}
+
+/* How many more times the room has to be redrawn because something in it
+   changed. It only matters once the room has stopped animating on its own. */
+let owed = 2;
+export function repaintRoom(n = 2) { owed = Math.max(owed, n); }
+
 /** What the room is doing, for anything that needs to observe it. */
 const state = {
   ready: false,
@@ -43,6 +74,7 @@ const state = {
   camera: [0, 0, 0],
   walk: 0,
   frames: 0,
+  tier: 0,
 };
 
 export function roomState() { return { ...state }; }
@@ -79,7 +111,14 @@ function canRender() {
 
 /* ------------------------------------------------------------------ mount */
 
-export async function renderRoom(host) {
+/**
+ * Build the studio into the shell.
+ *
+ * It is mounted once and never taken down: every screen in the app happens
+ * inside it, with the camera walked to whichever piece of equipment that
+ * screen belongs to.
+ */
+export async function mountRoom(host) {
   detachAll();
   host.innerHTML = '';
 
@@ -112,6 +151,7 @@ export async function renderRoom(host) {
 
   state.ready = true;
   state.webgl = true;
+  if (pendingFocus) { const w = pendingFocus; pendingFocus = null; focusRoom(w); }
   return room;
 }
 
@@ -124,6 +164,64 @@ function mountFallback(host) {
     return mod.renderRoom(host);
   });
 }
+
+/**
+ * Which piece of equipment a screen belongs to.
+ *
+ * Opening the library is walking to the crate; opening the settings is walking
+ * to the console. Anything with no object of its own is looked at from the
+ * middle of the room.
+ */
+const STANDS_AT = {
+  library: 'library', playlist: 'library', album: 'library', artist: 'library', genre: 'library',
+  settings: 'settings', add: 'add', search: 'search', detail: 'library',
+};
+
+/**
+ * Framing for a panel.
+ *
+ * When a panel covers the lower part of the screen the camera still aims at
+ * the equipment; the lens is shifted instead, so the object sits in the strip
+ * of room you can still see. Shifting the lens rather than tilting the camera
+ * keeps the verticals vertical, which is what a photographer would do.
+ */
+let panelMode = false;
+function applyBand() {
+  if (!studio || !room) return;
+  const w = room.clientWidth || 1;
+  const h = room.clientHeight || 1;
+  const camera = studio.camera;
+  if (panelMode) camera.setViewOffset(w, h, 0, h * 0.30, w, h);
+  else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+  layoutHotspots(w, h, true);
+  repaintRoom();
+}
+
+export function focusRoom(where) {
+  if (!studio || !spots.length) { pendingFocus = where; return; }
+  if (where === 'home') { panelMode = false; applyBand(); walkHome(); return; }
+  const pick = spots.find((s) => s.name === STANDS_AT[where]);
+  if (!pick) { panelMode = false; applyBand(); walkHome(); return; }
+
+  // Stand a couple of metres off the equipment, on the line back toward where
+  // you normally stand, and look straight at it. The panel takes the lower
+  // part of the screen, so the lens is shifted rather than the camera tilted.
+  const three = studio.three;
+  const target = new three.Vector3(...pick.look);
+  const away = new three.Vector3().subVectors(studio.home.pos, target);
+  away.y = 0;
+  if (away.lengthSq() < 0.01) away.set(0, 0, 1);
+  away.normalize().multiplyScalar(1.9);
+  const from = target.clone().add(away);
+  from.y = target.y + 0.18;
+
+  panelMode = true;
+  applyBand();
+  travel(from.toArray(), pick.look);
+}
+
+let pendingFocus = null;
 
 export function setRoomRouter(fn) {
   go = fn;
@@ -196,6 +294,7 @@ function buildHotspots() {
 
 /** An object gives a little when a finger lands on it. */
 function nudge(pick, down) {
+  repaintRoom();
   const node = pick.move || pick.node;
   if (!node) return;
   if (down) {
@@ -386,20 +485,37 @@ function stepWalk() {
   state.camera = studio.camera.position.toArray();
   if (!walk.done && walk.t > 0.62) {
     walk.done = true;
-    walk.then();
+    if (walk.then) walk.then();
     room.classList.remove('walking');
-    // put the camera back where it stands, ready for the next time
-    setTimeout(reseat, 260);
   }
   if (walk.t >= 1) walk = null;
 }
 
-function reseat() {
+/** Walk to a point, looking at a point, and stop there. */
+function travel(from, look, then) {
+  repaintRoom();
   if (!studio) return;
-  walk = null;
-  studio.camera.position.copy(studio.home.pos);
-  studio.aim.copy(studio.home.aim);
-  studio.camera.lookAt(studio.aim);
+  const three = studio.three;
+  walk = {
+    fromPos: studio.camera.position.clone(),
+    toPos: new three.Vector3(...from),
+    fromAim: studio.aim.clone(),
+    toAim: new three.Vector3(...look),
+    start: performance.now(),
+    dur: 620,
+    then: then || null,
+    done: false,
+  };
+  room.classList.add('walking');
+  setTimeout(() => stepWalk(), 400);
+  setTimeout(() => stepWalk(), 660);
+}
+
+/** Back to where you stand when you are not at anything in particular. */
+function walkHome() {
+  repaintRoom();
+  if (!studio) return;
+  travel(studio.home.pos.toArray(), studio.home.aim.toArray());
 }
 
 function strum() {
@@ -568,6 +684,7 @@ function bandGain(i) {
 }
 
 function setBandGain(i, value) {
+  repaintRoom();
   if (!settings.eqGains) return;
   settings.eqGains[i * 2] = value;
   settings.eqGains[i * 2 + 1] = value;
@@ -579,7 +696,11 @@ function setBandGain(i, value) {
 function armTo(t) {
   const arm = studio && studio.parts.tonearm;
   if (!arm) return;
-  arm.rotation.y = -0.30 + t * 0.42;
+  const to = -0.30 + t * 0.42;
+  // The arm is called for on every frame, so it only asks for a redraw when
+  // it has actually moved far enough to see.
+  if (Math.abs(to - arm.rotation.y) > 0.004) repaintRoom(1);
+  arm.rotation.y = to;
   state.arm = arm.rotation.y;
 }
 
@@ -600,7 +721,7 @@ function resize() {
   // hold the desk: the horizontal field is only about half the vertical one.
   studio.camera.fov = w / h < 0.75 ? 68 : 44;
   studio.camera.updateProjectionMatrix();
-  layoutHotspots(w, h, true);
+  applyBand();
 }
 
 /**
@@ -611,6 +732,12 @@ function resize() {
  * capo chip walks down the neck, the candle gutters. When nothing is playing
  * the room is not switched off — the standby lamps breathe and the candle
  * still moves, because a real room is never completely still.
+ *
+ * That is the room a machine can afford. One that cannot is given a cheaper
+ * one instead of a slower one: first the bloom pass and the extra pixels go,
+ * and then the idling stops altogether and the room is redrawn only when
+ * something in it has actually changed. A still room you can use beats a
+ * flickering one you cannot.
  */
 function live() {
   const parts = studio.parts;
@@ -618,12 +745,28 @@ function live() {
   let level = 0;
   let angle = 0;
   let breath = 0;
+  let nextTick = 0;
+  let cost = 0;      // how long a draw has been taking, smoothed
+  let nextDraw = 0;  // the earliest we will start another one
+  let tier = 0;      // 0 full, 1 stripped back, 2 lit but not animated
+
+  // A draw either goes through the bloom pass or, once we have decided this
+  // machine cannot afford it, straight to the screen.
+  const draw = () => {
+    if (tier === 0) studio.composer.render();
+    else studio.renderer.render(studio.scene, studio.camera);
+  };
 
   const frame = (now) => {
     if (!room || !room.isConnected || !studio) { raf = null; return; }
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const playing = player.playing;
+
+    // In the stripped-back room nothing idles: the picture is redrawn when
+    // something in it has actually changed, so the candle and the standby
+    // lamps stop asking for frames nobody can afford.
+    if (tier > 1 && !owed && !walk && !playing) { raf = requestAnimationFrame(frame); return; }
 
     const want = playing ? 0.34 + Math.random() * 0.5 : 0;
     level += (want - level) * Math.min(1, dt * 6);
@@ -682,17 +825,51 @@ function live() {
       s.position.z = s.userData.z0 + Math.sin(breath * 60 + s.userData.phase) * 0.0016 * s.userData.ring;
     }
 
+    if (tier > 1 && playing && now >= nextTick) { owed = 1; nextTick = now + 1500; }
+
     stepWalk();
     state.walk = walk ? walk.t : -1;
-    state.frames++;
     state.camera = studio.camera.position.toArray();
 
-    // The buttons follow the objects, but only when the camera has moved.
-    layoutHotspots(room.clientWidth || 1, room.clientHeight || 1);
+    // The room is always on screen, so it always draws — except when the app
+    // is in the background, where drawing it would only cost battery, and
+    // except when the last frame was expensive.
+    //
+    // A draw is the one thing here that can take longer than a frame, and on a
+    // weak GPU it can take very much longer. Left alone it would own the main
+    // thread and everything else in the app — importing a file, laying out a
+    // list, responding to a tap — would wait behind it. So we time each draw
+    // and refuse to start the next one until at least as long again has
+    // passed: the room keeps a full frame rate wherever a frame is cheap, and
+    // gives most of the thread back wherever it is not.
+    if (!covered() && now >= nextDraw && (owed > 0 || walk || (!handsOn && tier < 2))) {
+      // The buttons follow the objects, but only when the camera has moved.
+      layoutHotspots(room.clientWidth || 1, room.clientHeight || 1);
+      const began = performance.now();
+      draw();
+      const spent = performance.now() - began;
+      cost = cost ? cost * 0.75 + spent * 0.25 : spent;
+      if (owed > 0) owed--;
+      state.frames++;
 
-    // Nothing is rendered while the room is not the view: a studio you are not
-    // looking at should not be costing anyone battery.
-    if (room.offsetParent !== null) studio.composer.render();
+      // Step down before pacing: a machine that cannot draw this room at a
+      // sensible rate should be given a cheaper room, not a slower one. First
+      // the bloom pass and the extra pixels go; if it is still too dear the
+      // room stops animating and is drawn only when something changes.
+      if (cost > 110 && state.frames > 3) {
+        if (tier === 0) {
+          tier = 1;
+          studio.renderer.setPixelRatio(1);
+          studio.renderer.setSize(room.clientWidth || 1, room.clientHeight || 1, false);
+          cost = 0;
+        } else if (tier === 1) {
+          tier = 2;
+          cost = 0;
+        }
+        state.tier = tier;
+      }
+      nextDraw = performance.now() + Math.min(1200, Math.max(0, cost - 8));
+    }
     raf = requestAnimationFrame(frame);
   };
 
@@ -705,6 +882,8 @@ function live() {
     if (room) room.classList.toggle('loaded', !!track);
   };
   on(player, 'trackchange', paint);
+  on(player, 'play', () => repaintRoom(3));
+  on(player, 'pause', () => repaintRoom(3));
   paint();
 
   raf = requestAnimationFrame(frame);

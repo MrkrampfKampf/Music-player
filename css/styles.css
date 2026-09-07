@@ -2217,3 +2217,294 @@ body {
 /* The dot leader belongs in a numbered track listing, where it runs from the
    title out to the time. In a song list with artwork it is a stray dash. */
 .row:not(:has(.row-index)) .leader { display: none; }
+
+/* =========================================================================
+   THE RACK
+
+   Settings are not a page of preferences: they are the front of a rack unit
+   standing on the desk. A machined faceplate, engraved legends, real toggles
+   and a rotary control, with the section names stamped on small plates the
+   way a piece of studio hardware is labelled.
+
+   Everything a list needed is still here — the name of the setting, what it
+   does, and its state — because a control you cannot read is not a control.
+   ========================================================================= */
+
+/* The sign at the top of a panel is an engraved plate, not a headline. */
+body:not(.in-room) .view-head {
+  padding: 12px 0 10px;
+  margin-bottom: 12px;
+  border-bottom: 0;
+  background: none;
+}
+body:not(.in-room) .view-head::before,
+body:not(.in-room) .view-head::after { content: none; }
+body:not(.in-room) .view-head h1 {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #cbbfa2;
+  padding: 7px 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 246, 226, 0.1) 0 1px, rgba(0, 0, 0, 0.26) 1px 100%),
+    linear-gradient(170deg, #3a342c, #211d18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 226, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7),
+    0 2px 5px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75);
+}
+
+/* A rack unit. Brushed alloy, screwed in at the corners. */
+.settings-group {
+  position: relative;
+  margin: 0 0 16px;
+  padding: 26px 16px 16px;
+  background:
+    repeating-linear-gradient(96deg, rgba(255, 246, 226, 0.035) 0 1px, rgba(0, 0, 0, 0.05) 1px 2px),
+    linear-gradient(180deg, #3f3930 0%, #2b2621 24%, #23201b 72%, #191612 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 226, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.8),
+    inset 2px 0 0 rgba(0, 0, 0, 0.35),
+    inset -2px 0 0 rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.55);
+}
+/* Four screws, one at each corner of the plate. */
+.settings-group::before,
+.settings-group::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  width: 9px;
+  background-image:
+    radial-gradient(circle at 50% 4.5px, #6e6656 0 3.4px, rgba(0, 0, 0, 0) 3.6px),
+    radial-gradient(circle at 50% calc(100% - 4.5px), #6e6656 0 3.4px, rgba(0, 0, 0, 0) 3.6px);
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.8));
+}
+.settings-group::before { left: 5px; }
+.settings-group::after { right: 5px; }
+
+/* The section name is stamped into the plate. */
+.settings-group > h2 {
+  position: absolute;
+  top: 7px;
+  left: 20px;
+  margin: 0;
+  font-size: 8.5px;
+  letter-spacing: 0.3em;
+  color: rgba(236, 226, 205, 0.45);
+  text-shadow: 0 1px 0 rgba(255, 246, 226, 0.12), 0 -1px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* A strip on the faceplate: legend, what it does, and the control. */
+.setting,
+.knob-row {
+  align-items: center;
+  gap: 14px;
+  padding: 14px 2px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 0 rgba(255, 246, 226, 0.05);
+}
+.settings-group .setting:last-child,
+.settings-group .knob-row:last-child { border-bottom: 0; box-shadow: none; }
+.setting-text b {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: #ddd2b6;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+}
+.setting-text span {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  color: rgba(236, 226, 205, 0.42);
+  margin-top: 5px;
+}
+
+/* A reading on the unit, in amber, behind glass. */
+.setting-value {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #ffc46a;
+  padding: 4px 8px;
+  background: linear-gradient(180deg, #14100a, #0b0806);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 196, 106, 0.16),
+    inset 0 2px 5px rgba(0, 0, 0, 0.9),
+    0 0 10px rgba(255, 176, 92, 0.12);
+  text-shadow: 0 0 7px rgba(255, 176, 92, 0.6);
+}
+
+/* The equaliser is the one thing on the rack that is already a mixer, so it
+   gets its own sunken bay rather than a card. */
+.eq-desk {
+  background:
+    linear-gradient(180deg, #14120f, #0d0b09);
+  border: 0;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px rgba(255, 246, 226, 0.06),
+    0 1px 0 rgba(255, 246, 226, 0.07);
+}
+
+/* Notices on the rack are engraved warnings, not cards. */
+.notice {
+  background: linear-gradient(180deg, rgba(255, 176, 92, 0.05), rgba(0, 0, 0, 0.2));
+  border-left: 2px solid rgba(212, 160, 74, 0.5);
+}
+
+/* Storage is a level meter on the unit, so it belongs in the same glass. */
+.storage-bar {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 196, 106, 0.14),
+    inset 0 2px 5px rgba(0, 0, 0, 0.9);
+}
+
+
+/* A rotary control needs room around it, or the next legend collides with it. */
+.knob-row { padding: 20px 2px; min-height: 78px; }
+.knob { flex: none; }
+
+/* The legend and its note are what make a faceplate readable; keep the note
+   narrow so it does not wrap into a paragraph. */
+.setting-text { max-width: 30ch; }
+.setting-text span { font-size: 10px; line-height: 1.5; }
+
+/* =========================================================================
+   THE EQUIPMENT PANELS
+
+   A screen is not a page in an app. It is the paperwork, the faceplate or
+   the label belonging to whatever the camera just walked up to, and the room
+   is still there behind it. So a panel reads as something in the room: it
+   slides up off the desk, it has a machined lip along its top edge with the
+   two screws that hold the lip down, and its heading says which piece of
+   equipment you are standing at.
+
+   Only the material changes with the equipment. A row is still a row, a
+   switch is still a switch, and everything stays legible in a dark room at
+   arm's length — the point is that the app is somewhere, not that it is
+   hard to read.
+   ========================================================================= */
+
+/* --------------------------------------------------------- the top edge */
+
+/* On the room rather than on the panel, because the panel scrolls and the
+   edge of a machine does not. */
+body:not(.in-room) .room-host::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 62%;
+  height: 9px;
+  z-index: 6;
+  pointer-events: none;
+  background:
+    /* the two screws that hold the lip on */
+    radial-gradient(circle at 15px 5px,
+      rgba(0, 0, 0, 0.85) 0 1.4px, rgba(255, 226, 176, 0.22) 1.4px 2.3px, rgba(0, 0, 0, 0) 2.6px),
+    radial-gradient(circle at calc(100% - 15px) 5px,
+      rgba(0, 0, 0, 0.85) 0 1.4px, rgba(255, 226, 176, 0.22) 1.4px 2.3px, rgba(0, 0, 0, 0) 2.6px),
+    linear-gradient(180deg, #4b4137 0%, #2c251e 44%, #171310 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 224, 178, 0.42),
+    0 1px 0 rgba(0, 0, 0, 0.85),
+    0 7px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ------------------------------------------------- which machine this is */
+
+/* Under the title, in the small stencilled type used on equipment, the name
+   of the thing you are standing at. It is the only part of the panel that
+   tells you where you are, and it costs one line. */
+.view-head h1 {
+  position: relative;
+}
+.view-head h1::after {
+  display: block;
+  margin-top: 1px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(228, 200, 158, 0.4);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75);
+}
+body[data-at="library"] .view-head h1::after { content: "Record crate"; }
+body[data-at="search"] .view-head h1::after { content: "Microphone"; }
+body[data-at="add"] .view-head h1::after { content: "Tape machine"; }
+body[data-at="settings"] .view-head h1::after { content: "Mixing console"; }
+
+/* The detail screens have no head of their own; the hero carries the label. */
+.detail-hero .detail-kind {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(228, 200, 158, 0.42);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.75);
+}
+
+/* -------------------------------------------------------- the dividers */
+
+/* The library's tabs are the card dividers standing up in the crate: a row
+   of tabs, the one you are looking at pulled forward into the light. */
+body[data-at="library"] .segmented,
+body[data-at="search"] .segmented {
+  gap: 3px;
+  padding: 0 2px;
+  background: none;
+  border-radius: 0;
+}
+body[data-at="library"] .segmented button,
+body[data-at="search"] .segmented button {
+  border-radius: 3px 3px 0 0;
+  padding: 8px 13px 9px;
+  color: rgba(232, 214, 186, 0.62);
+  background:
+    linear-gradient(180deg, rgba(255, 236, 200, 0.05), rgba(0, 0, 0, 0.22));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 195, 0.09),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+body[data-at="library"] .segmented button[aria-selected="true"],
+body[data-at="search"] .segmented button[aria-selected="true"] {
+  color: #f6e6c8;
+  background:
+    linear-gradient(180deg, #6d5f4c 0%, #4a3f32 38%, #362d24 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 200, 0.32),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 -1px 8px rgba(255, 190, 110, 0.14);
+}
+
+/* --------------------------------------------------------- liked songs */
+
+/* Liked Songs used to be a purple-to-pink square, which is the one colour
+   nothing in this room could produce. It is a brass heart stamped into a
+   dark leather cover instead. */
+.art.liked {
+  display: grid;
+  place-items: center;
+  color: #e0b063;
+  background:
+    radial-gradient(120% 100% at 26% 12%, rgba(255, 214, 160, 0.16), rgba(0, 0, 0, 0) 58%),
+    linear-gradient(160deg, #4a2622 0%, #331a18 52%, #21100f 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 214, 168, 0.16),
+    0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.art.liked svg {
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.7)) drop-shadow(0 -1px 0 rgba(255, 226, 180, 0.22));
+}

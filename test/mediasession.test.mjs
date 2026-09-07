@@ -143,9 +143,13 @@ const before = await page.evaluate(async () => {
 });
 check('a single element is used by default', before.two === false && before.active === 0, JSON.stringify(before));
 
-await page.evaluate(async () => {
+// Where the skip started from. The fixtures are six seconds long, so on a
+// slow machine a track can end by itself while the checks above are running.
+const from = await page.evaluate(async () => {
   const { player } = await import('./js/player.js');
+  const at = player.index;
   await player.next();
+  return at;
 });
 await page.waitForTimeout(2500);
 
@@ -154,7 +158,9 @@ const after = await page.evaluate(async () => {
   return { active: player._active, playing: player.playing, index: player.index, title: player.current.title };
 });
 check('skipping keeps the same element', after.active === 0, JSON.stringify(after));
-check('skipping actually advances and plays', after.index === 1 && after.playing === true, JSON.stringify(after));
+check('skipping actually advances and plays',
+  after.index === from + 1 && after.playing === true,
+  JSON.stringify({ from, after }));
 
 const state = await page.evaluate(() => navigator.mediaSession.playbackState);
 check('playback state is reported as playing', state === 'playing', String(state));

@@ -509,7 +509,7 @@
 
 /* ------------------------------------------------------------ the deck */
 
-.deck-well {
+.room .deck-well {
   position: absolute;
   left: 50%; top: 50%;
   width: 200px; height: 200px;
@@ -518,7 +518,7 @@
   background: radial-gradient(closest-side, #0a0908 96%, rgba(0,0,0,0));
   box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 246, 226, 0.09);
 }
-.platter {
+.room .platter {
   position: absolute;
   left: 50%; top: 50%;
   width: 186px; height: 186px;
@@ -526,25 +526,25 @@
   border-radius: 50%;
   transform-origin: 50% 50%;
 }
-.disc {
+.room .disc {
   position: absolute; inset: 0;
   border-radius: 50%;
   background:
     repeating-radial-gradient(circle at 50% 50%,
-      rgba(255, 244, 220, 0.045) 0 1px, rgba(0, 0, 0, 0.5) 1px 2.4px),
+    rgba(255, 244, 220, 0.045) 0 1px, rgba(0, 0, 0, 0.5) 1px 2.4px),
     radial-gradient(circle at 36% 28%, #262220 0%, #100e0c 44%, #050404 100%);
   box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
 }
-.disc::after {
+.room .disc::after {
   content: "";
   position: absolute; inset: 0;
   border-radius: 50%;
-  background: linear-gradient(148deg,
+    background: linear-gradient(148deg,
     rgba(255, 243, 214, 0.22) 0%, rgba(255, 243, 214, 0.02) 18%,
     rgba(255, 243, 214, 0) 44%, rgba(255, 214, 150, 0.06) 66%,
     rgba(255, 243, 214, 0.14) 100%);
 }
-.disc-label {
+.room .disc-label {
   position: absolute;
   left: 50%; top: 50%;
   width: 70px; height: 70px;
@@ -565,7 +565,7 @@
   line-height: 1.3;
   box-shadow: inset 0 0 0 1px rgba(255, 220, 170, 0.25);
 }
-.spindle {
+.room .spindle {
   position: absolute;
   left: 50%; top: 50%;
   width: 7px; height: 7px;
@@ -573,7 +573,7 @@
   border-radius: 50%;
   background: linear-gradient(150deg, #f2e9d4, #8b8270 60%, #3c362d);
 }
-.arm-post {
+.room .arm-post {
   position: absolute;
   right: 16px; top: 22px;
   width: 34px; height: 34px;
@@ -581,7 +581,7 @@
   background: radial-gradient(circle at 34% 28%, #cfc2a6, #6f6656 56%, #2a251e);
   box-shadow: 0 3px 7px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 250, 235, 0.4);
 }
-.arm-post::after {
+.room .arm-post::after {
   content: "";
   position: absolute;
   left: 9px; top: 9px;
@@ -589,7 +589,7 @@
   border-radius: 50%;
   background: linear-gradient(150deg, #ffeec2, #d4a04a 34%, #87611f);
 }
-.arm {
+.room .arm {
   position: absolute;
   right: 25px; top: 31px;
   width: 150px; height: 16px;
@@ -599,7 +599,7 @@
   touch-action: none;
 }
 .arm:active { cursor: grabbing; }
-.arm-tube {
+.room .arm-tube {
   position: absolute;
   left: 12px; right: 8px; top: 6px;
   height: 4px;
@@ -607,7 +607,7 @@
   background: linear-gradient(180deg, #eadfc9, #8c8371 46%, #3c362d);
   box-shadow: 0 5px 7px rgba(0, 0, 0, 0.55);
 }
-.arm-head {
+.room .arm-head {
   position: absolute;
   left: 0; top: 1px;
   width: 22px; height: 14px;
@@ -615,7 +615,7 @@
   background: linear-gradient(160deg, #cbbfa6 0%, #7d7461 55%, #45403a 100%);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.6);
 }
-.arm-head::after {
+.room .arm-head::after {
   content: "";
   position: absolute;
   left: 3px; bottom: -5px;
@@ -623,7 +623,7 @@
   background: #c0442f;
   clip-path: polygon(0 0, 100% 0, 76% 100%, 22% 100%);
 }
-.deck-key {
+.room .deck-key {
   position: absolute;
   bottom: 12px;
   width: 40px; height: 20px;
@@ -640,7 +640,7 @@
 .deck-key[data-deck-key="45"] { left: 58px; }
 .deck-key:active { transform: translateY(2px); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8); }
 .deck-key.on { color: #f0e2c4; box-shadow: 0 2px 0 rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,246,226,0.2), 0 0 8px rgba(212,160,74,0.35); }
-.deck-plate {
+.room .deck-plate {
   position: absolute;
   right: 12px; bottom: 12px;
   padding: 3px 7px;
@@ -656,7 +656,7 @@
 
 /* --------------------------------------------------------- the console */
 
-.vu {
+.room .vu {
   position: absolute;
   top: 12px;
   width: 82px; height: 34px;
@@ -666,19 +666,19 @@
 }
 .vu { left: 16px; }
 .vu.vu-r { left: 106px; }
-.vu::after {
+.room .vu::after {
   content: "";
   position: absolute; inset: 0;
   background: linear-gradient(158deg, rgba(255, 246, 226, 0.14) 0 24%, rgba(255, 246, 226, 0) 52%);
 }
-.vu span {
+.room .vu span {
   position: absolute;
   right: 5px; bottom: 3px;
   color: rgba(212, 160, 74, 0.6);
   font-family: var(--mono);
   font-size: 7px;
 }
-.needle {
+.room .needle {
   position: absolute;
   left: 50%; bottom: 3px;
   width: 1.4px; height: 26px;
@@ -687,19 +687,19 @@
   transform-origin: 50% 100%;
   box-shadow: 0 0 5px rgba(212, 160, 74, 0.7);
 }
-.strip {
+.room .strip {
   position: absolute;
   left: 14px; right: 14px; bottom: 12px;
   display: flex;
   justify-content: space-between;
 }
-.fader {
+.room .fader {
   position: relative;
   width: 26px; height: 96px;
   touch-action: none;
   cursor: ns-resize;
 }
-.fader .slot {
+.room .fader .slot {
   position: absolute;
   left: 50%; top: 6px; bottom: 16px;
   width: 4px;
@@ -708,7 +708,7 @@
   background: #050404;
   box-shadow: inset 0 0 3px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 246, 226, 0.12);
 }
-.fader .cap {
+.room .fader .cap {
   position: absolute;
   left: 1px;
   top: 50%;
@@ -720,14 +720,14 @@
   transform: translateY(var(--t, 0px));
   transition: transform 0.05s linear;
 }
-.fader .cap::after {
+.room .fader .cap::after {
   content: "";
   position: absolute;
   left: 2px; right: 2px; top: 5.4px;
   height: 2px;
   background: rgba(0, 0, 0, 0.55);
 }
-.fader span {
+.room .fader span {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   text-align: center;
@@ -735,7 +735,7 @@
   font-family: var(--mono);
   font-size: 6.5px;
 }
-.knob {
+.room .knob {
   position: absolute;
   right: 16px; top: 56px;
   width: 40px; height: 40px;
@@ -748,7 +748,7 @@
       #cfc2a6, #6f6656 22%, #cfc2a6 46%, #4a443a 70%, #b3a891 88%, #56503f);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 250, 235, 0.45);
 }
-.knob i {
+.room .knob i {
   position: absolute;
   left: 50%; top: 4px;
   width: 2px; height: 12px;
@@ -757,7 +757,7 @@
   transform-origin: 50% 16px;
   transform: rotate(var(--a, -140deg));
 }
-.knob-tag {
+.room .knob-tag {
   position: absolute;
   right: 16px; top: 100px;
   width: 40px;
@@ -769,7 +769,7 @@
 
 /* -------------------------------------------------------- the speakers */
 
-.cone {
+.room .cone {
   position: absolute;
   left: 50%;
   border-radius: 50%;
@@ -780,7 +780,7 @@
   transform: translateX(-50%) translateZ(var(--push, 0px));
   transition: transform 0.06s linear;
 }
-.cone::after {
+.room .cone::after {
   content: "";
   position: absolute;
   left: 50%; top: 50%;
@@ -795,14 +795,14 @@
 /* ------------------------------------------------------------ the crate */
 
 .sleeve-tops { position: absolute; inset: 6px 10px; display: flex; gap: 3px; }
-.sleeve {
+.room .sleeve {
   flex: 1;
   border-radius: 1px;
   background: linear-gradient(180deg, var(--c), rgba(0, 0, 0, 0.7));
   box-shadow: inset 0 1px 0 rgba(255, 246, 226, 0.22), 2px 0 3px rgba(0, 0, 0, 0.6);
   transform: rotate(calc((var(--n) - 2) * 0.7deg));
 }
-.crate-plate {
+.room .crate-plate {
   position: absolute;
   left: 50%; bottom: 26px;
   width: 74px; height: 22px;
@@ -813,7 +813,7 @@
 
 /* ----------------------------------------------------- the tape machine */
 
-.reel {
+.room .reel {
   position: absolute;
   top: 30px;
   width: 92px; height: 92px;
@@ -825,7 +825,7 @@
 .reel-l { left: 22px; }
 .reel-r { right: 22px; }
 .reel.small { background: radial-gradient(closest-side, #0a0908 56%, #2c241b 57%, #1a1512 100%); }
-.reel i {
+.room .reel i {
   position: absolute;
   left: 50%; top: 50%;
   width: 6px; height: 42px;
@@ -835,7 +835,7 @@
 }
 .reel i:nth-child(2) { transform: rotate(60deg); }
 .reel i:nth-child(3) { transform: rotate(120deg); }
-.reel::after {
+.room .reel::after {
   content: "";
   position: absolute;
   left: 50%; top: 50%;
@@ -844,7 +844,7 @@
   border-radius: 50%;
   background: linear-gradient(150deg, #eadfc9, #8c8371 50%, #3c362d);
 }
-.tape-path {
+.room .tape-path {
   position: absolute;
   left: 46px; right: 46px; top: 116px;
   height: 22px;
@@ -852,7 +852,7 @@
   border-radius: 0 0 40px 40px;
 }
 .tape-keys { position: absolute; left: 20px; bottom: 14px; display: flex; gap: 8px; }
-.tape-keys b {
+.room .tape-keys b {
   width: 24px; height: 12px;
   border-radius: 1px;
   background: linear-gradient(180deg, #d8cdb4, #6d6455);
@@ -862,7 +862,7 @@
 
 /* ----------------------------------------------------------- the tuner */
 
-.dial {
+.room .dial {
   position: absolute;
   left: 14px; top: 14px;
   width: 150px; height: 42px;
@@ -870,12 +870,12 @@
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 246, 226, 0.1);
   overflow: hidden;
 }
-.dial-glass {
+.room .dial-glass {
   position: absolute; inset: 0;
   background: linear-gradient(160deg, rgba(255, 246, 226, 0.16) 0 26%, rgba(255, 246, 226, 0) 56%);
 }
 .dial-mark { position: absolute; top: 8px; width: 1px; height: 10px; background: rgba(212, 160, 74, 0.5); }
-.dial-needle {
+.room .dial-needle {
   position: absolute;
   left: 42%; top: 4px; bottom: 4px;
   width: 1.6px;
@@ -894,7 +894,7 @@
     conic-gradient(from 200deg, #cfc2a6, #625a4b 26%, #b3a891 52%, #4a443a 76%, #a4997f);
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
 }
-.tuner-knob i {
+.room .tuner-knob i {
   position: absolute;
   left: 50%; top: 4px;
   width: 2px; height: 10px;
@@ -905,7 +905,7 @@
 /* ------------------------------------------------------ the headphones */
 
 .hook { position: absolute; left: 50%; top: 0; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #6d6455; }
-.band {
+.room .band {
   position: absolute;
   left: 50%; top: 4px;
   width: 92px; height: 92px;
@@ -915,7 +915,7 @@
   border-radius: 50%;
   box-shadow: inset 0 1px 0 rgba(255, 246, 226, 0.14);
 }
-.band::after {
+.room .band::after {
   content: "";
   position: absolute;
   left: -6px; right: -6px; top: -6px; bottom: -6px;
@@ -923,19 +923,19 @@
   border-bottom-color: transparent;
   border-radius: 50%;
 }
-.cup {
+.room .cup {
   position: absolute;
   top: 46px;
   width: 30px; height: 48px;
   border-radius: 12px;
   background:
-    radial-gradient(circle at 0.6px 0.6px, rgba(255, 232, 196, 0.1) 0.35px, rgba(0,0,0,0) 0.6px) 0 0 / 3px 3px,
+    radial-gradient(circle at 0.6px 0.6px, rgba(255, 232, 196, 0.1) 0.35px, rgba(0, 0, 0, 0) 0.6px) 0 0 / 3px 3px,
     linear-gradient(160deg, #241f1b, #100d0b);
   box-shadow: 0 5px 10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 246, 226, 0.1);
 }
 .cup.l { left: 20px; }
 .cup.r { right: 20px; }
-.cord {
+.room .cord {
   position: absolute;
   right: 26px; top: 92px;
   width: 40px; height: 80px;
@@ -946,7 +946,7 @@
 
 /* ------------------------------------------------------ the microphone */
 
-.mic-foot {
+.room .mic-foot {
   position: absolute;
   left: 50%; bottom: 0;
   width: 130px; height: 26px;
@@ -955,14 +955,14 @@
   background: radial-gradient(ellipse at 40% 30%, #2e2721, #100d0b 70%);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
 }
-.mic-pole {
+.room .mic-pole {
   position: absolute;
   left: 50%; bottom: 14px;
   width: 8px; height: 400px;
   margin-left: -4px;
   background: linear-gradient(90deg, #100e0c, #7d7461 42%, #cabea5 52%, #4a443a 100%);
 }
-.mic-boom {
+.room .mic-boom {
   position: absolute;
   left: 50%; top: 84px;
   width: 66px; height: 6px;
@@ -971,7 +971,7 @@
   transform: rotate(9deg);
   transform-origin: 100% 50%;
 }
-.mic-body {
+.room .mic-body {
   position: absolute;
   left: 50%; top: 62px;
   margin-left: -78px;
@@ -980,21 +980,21 @@
   background: linear-gradient(150deg, #d8cdb4, #6d6455 55%, #2f2a24);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.65);
 }
-.mic-head {
+.room .mic-head {
   position: absolute;
   left: 50%; top: 14px;
   margin-left: -86px;
   width: 42px; height: 54px;
   border-radius: 22px 22px 20px 20px;
   background:
-    radial-gradient(circle at 0.7px 0.7px, rgba(255, 240, 210, 0.16) 0.4px, rgba(0,0,0,0) 0.8px) 0 0 / 3.4px 3.4px,
+    radial-gradient(circle at 0.7px 0.7px, rgba(255, 240, 210, 0.16) 0.4px, rgba(0, 0, 0, 0) 0.8px) 0 0 / 3.4px 3.4px,
     radial-gradient(circle at 34% 24%, #4a4238, #1a1512 68%);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.7), inset 0 2px 6px rgba(255, 246, 226, 0.1);
 }
 
 /* ---------------------------------------------------------- the guitar */
 
-.g-body {
+.room .g-body {
   position: absolute;
   left: 50%; bottom: 0;
   width: 200px; height: 250px;
@@ -1008,7 +1008,7 @@
     92% 62%, 92% 78%, 82% 92%, 62% 100%, 38% 100%, 18% 92%, 8% 78%, 8% 62%,
     16% 50%, 26% 42%, 26% 36%, 18% 28%, 16% 18%, 22% 6%);
 }
-.g-hole {
+.room .g-hole {
   position: absolute;
   left: 50%; bottom: 148px;
   width: 62px; height: 62px;
@@ -1017,7 +1017,7 @@
   background: radial-gradient(circle at 40% 34%, #120d08, #050403);
   box-shadow: 0 0 0 4px rgba(74, 48, 24, 0.9), inset 0 4px 8px rgba(0, 0, 0, 0.9);
 }
-.g-neck {
+.room .g-neck {
   position: absolute;
   left: 50%; bottom: 236px;
   width: 34px; height: 296px;
@@ -1025,7 +1025,7 @@
   background: linear-gradient(90deg, #1c130c, #4a3220 40%, #6b4a2c 56%, #241809);
   box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5);
 }
-.g-head {
+.room .g-head {
   position: absolute;
   left: 50%; top: 0;
   width: 50px; height: 66px;
@@ -1034,7 +1034,7 @@
   background: linear-gradient(150deg, #4b3320, #251809);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
 }
-.g-bridge {
+.room .g-bridge {
   position: absolute;
   left: 50%; bottom: 62px;
   width: 60px; height: 12px;
@@ -1043,7 +1043,7 @@
   background: linear-gradient(180deg, #5a3d24, #1d1309);
 }
 .g-strings { position: absolute; left: 50%; top: 46px; bottom: 62px; width: 26px; margin-left: -13px; }
-.g-strings b {
+.room .g-strings b {
   position: absolute;
   top: 0; bottom: 0;
   width: 1px;
@@ -1073,7 +1073,7 @@
 
 /* The capo chip: a small machine clamped to the neck that walks down it as
    the track plays. It is the only progress indicator in the room. */
-.chip {
+.room .chip {
   position: absolute;
   left: 50%;
   top: calc(52px + var(--t, 0%) * 2.5);
@@ -1084,7 +1084,7 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 250, 235, 0.55);
   transition: top 0.45s linear;
 }
-.chip i {
+.room .chip i {
   position: absolute;
   top: 5px;
   width: 8px; height: 8px;
@@ -1093,7 +1093,7 @@
 }
 .chip i:nth-child(1) { left: 5px; }
 .chip i:nth-child(2) { right: 5px; }
-.chip span {
+.room .chip span {
   position: absolute;
   left: 50%; top: 7px;
   width: 6px; height: 6px;
@@ -1106,7 +1106,7 @@
 .room.playing .chip span { opacity: 1; }
 
 /* The crate is open at the front, so the sleeves in it show. */
-.crate-front {
+.room .crate-front {
   position: absolute;
   left: 12px; right: 12px; top: 10px;
   height: 76px;
@@ -1118,3 +1118,96 @@
       #33293c 28px 35px, #0b0908 35px 37px);
   box-shadow: inset 0 12px 18px rgba(0, 0, 0, 0.8), inset 0 -6px 10px rgba(0, 0, 0, 0.6);
 }
+
+/* -------------------------------------------------------------------------
+   THE STUDIO IS THE APP
+
+   The room is mounted once behind everything and never taken down. A screen
+   is not a page that replaces it: the camera walks to the piece of equipment
+   that screen belongs to, and what the equipment has to say slides up in
+   front of it on the desk, with the room still there above.
+   ------------------------------------------------------------------------- */
+
+.room-host {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+.room-host .room {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
+/* The panel that a piece of equipment puts in front of you. It sits on the
+   desk: lit along its top edge, grained, and heavy enough to cast onto the
+   room behind it. */
+body:not(.in-room) .main {
+  top: auto;
+  height: 62%;
+  background:
+    linear-gradient(180deg, rgba(10, 8, 7, 0.9) 0%, #0b0908 9%, #0b0908 100%);
+  box-shadow:
+    0 -1px 0 rgba(255, 206, 140, 0.28),
+    0 -2px 0 rgba(0, 0, 0, 0.8),
+    0 -30px 60px rgba(0, 0, 0, 0.75);
+  animation: panel-up 0.34s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+@keyframes panel-up {
+  from { transform: translateY(14%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+/* Above the panel the room keeps going, a little darker so the panel reads as
+   the lit thing. */
+body:not(.in-room) .room-host::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 5, 4, 0.42) 0%, rgba(6, 5, 4, 0.1) 26%, rgba(6, 5, 4, 0) 40%);
+}
+
+/* In the room itself nothing is in front of anything: the home view holds no
+   panel, so it must not take the touches meant for the equipment behind it.
+   Anything it does hold — the empty-room notice — takes them back. */
+body.in-room .main { pointer-events: none; background: none; box-shadow: none; }
+body.in-room .view[data-view="home"] { pointer-events: none; height: 100%; }
+body.in-room .view[data-view="home"] * { pointer-events: auto; }
+body.in-room #home-body { height: 100%; }
+body.in-room #home-body:empty { display: none; }
+body.in-room #mini { display: none; }
+
+/* The player bar is gone for good: the deck, the speakers and the capo chip
+   are how the room says what is playing. It stays in the document, hidden the
+   way a skip link is hidden — out of the layout and off the screen, but still
+   focusable — so the keyboard and assistive technology keep a route to the
+   player that does not depend on aiming at an object in the room. */
+#mini {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 40;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Tabbed to, it comes back as a small chip, because a control you can reach
+   but cannot see is worse than no control at all. */
+#mini:focus-visible,
+#mini:focus-within {
+  width: auto;
+  height: auto;
+  max-width: min(78vw, 320px);
+  padding: 8px 12px;
+  overflow: visible;
+  clip-path: none;
+  border-radius: 999px;
+  background: #17110c;
+  box-shadow: 0 0 0 1px rgba(255, 206, 140, 0.32), 0 12px 34px rgba(0, 0, 0, 0.7);
+}
+body { --mini-h: 0px; }

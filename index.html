@@ -22,11 +22,16 @@
 
 <div id="app" class="app">
 
-  <!-- Scrolling content. One view is visible at a time. -->
+  <!-- The studio. It is rendered once and never taken down: every screen in
+       the app happens inside it, with the camera walked to the equipment the
+       screen belongs to. -->
+  <div id="room-host" class="room-host"></div>
+
+  <!-- Whatever the equipment you walked up to has to say. One at a time, and
+       always over the room rather than instead of it. -->
   <main id="main" class="main">
 
-    <!-- Home has no chrome of its own. The room fills it, and the equipment
-         in the room is the navigation. -->
+    <!-- Home is the room itself, so this holds nothing at all. -->
     <section class="view" data-view="home" hidden>
       <div id="home-body"></div>
     </section>
@@ -101,7 +106,9 @@
 
   </main>
 
-  <!-- Mini player, sits directly above the tab bar. -->
+  <!-- The deck, the speakers and the capo chip say what is playing, so this
+       is only here for assistive technology and for opening the player from
+       the keyboard. It is never drawn. -->
   <button id="mini" class="mini" hidden aria-label="Open the player">
     <span class="mini-art"><img id="mini-img" alt=""></span>
     <span class="mini-text">

@@ -11,7 +11,6 @@ import {
   isHiRes, menuSheet, promptSheet, confirmSheet, closeSheet, toast, artworkUrl,
 } from './ui.js';
 import { tick, press } from './tactile.js';
-import { renderRoom } from './room.js';
 
 let router = null;
 export function setRouter(fn) { router = fn; }
@@ -409,24 +408,24 @@ function artistCard(artist) {
 
 /* -------------------------------------------------------------------- home */
 
+/**
+ * Home.
+ *
+ * There is nothing to render: home is the room, the room is mounted in the
+ * shell, and the equipment in it is the navigation. All this does is say so
+ * when the room has nothing to play.
+ */
 export async function renderHome(host) {
   clear(host);
-
-  if (!library.tracks.length) {
-    host.append(emptyState({
-      icon: 'note',
-      title: 'The room is empty',
-      body: 'Bring some records in and the deck has something to play. Add files '
-        + 'from your iPhone, or send the tuner looking for something online.',
-      action: { label: 'Add music', onSelect: () => document.getElementById('file-input').click() },
-    }));
-    return;
-  }
-
-  // Home is the room. Nothing is laid on top of it: what is playing shows on
-  // the deck, the position shows on the guitar's capo chip, and everywhere
-  // else in the app is something you can walk up to and touch.
-  await renderRoom(host);
+  if (library.tracks.length) return;
+  host.append(emptyState({
+    icon: 'note',
+    title: 'The room is empty',
+    body: 'Bring some records in and the deck has something to play. Load the '
+      + 'tape machine with files from your iPhone, or send the tuner looking '
+      + 'for something online.',
+    action: { label: 'Add music', onSelect: () => document.getElementById('file-input').click() },
+  }));
 }
 
 function emptyState({ icon: iconName, title, body, action }) {
@@ -505,7 +504,7 @@ export function renderLibrary(host, tab) {
     const rows = el('div', { class: 'rows' });
 
     const likedRow = el('button', { class: 'row' },
-      el('span', { class: 'art', style: { background: 'linear-gradient(135deg,#7c3aed,#db2777)', display: 'grid', placeItems: 'center' } }, icon('heart-fill', 22)),
+      el('span', { class: 'art liked' }, icon('heart-fill', 22)),
       el('span', { class: 'row-text' },
         el('span', { class: 'row-title', text: 'Liked Songs' }),
         el('span', { class: 'row-sub' }, el('span', { text: plural(liked.length, 'song') }))));
@@ -743,9 +742,13 @@ export async function renderDetail(host, route) {
   return undefined;
 }
 
-async function heroBlock(host, { artworkKey, title, subtitle, meta, round = false, tracks, actions }) {
+async function heroBlock(host, { artworkKey, title, subtitle, meta, round = false, tracks, actions, kind }) {
   const hero = el('div', { class: 'detail-hero' + (round ? ' round' : '') },
     artNode(artworkKey),
+    // What you are holding: a sleeve out of the crate, a card from the index,
+    // the label on a tape box. The room is still behind this, so the screen
+    // has to say which bit of it you walked to.
+    kind ? el('div', { class: 'detail-kind', text: kind }) : null,
     el('div', { class: 'detail-title', text: title }),
     subtitle ? el('div', { class: 'detail-sub', text: subtitle }) : null,
     meta ? el('div', { class: 'detail-meta', text: meta }) : null);
@@ -773,6 +776,7 @@ async function renderAlbum(host, key) {
   const total = album.tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
   await heroBlock(host, {
     artworkKey: album.artworkKey,
+    kind: 'Sleeve',
     title: album.name,
     subtitle: album.artist,
     meta: [album.year, plural(album.tracks.length, 'song'), formatDurationLong(total)].filter(Boolean).join(' · '),
@@ -789,6 +793,7 @@ async function renderArtist(host, key) {
 
   await heroBlock(host, {
     artworkKey: artist.artworkKey,
+    kind: 'Index card',
     title: artist.name,
     meta: plural(artist.albums.size, 'album') + ' · ' + plural(artist.tracks.length, 'song'),
     round: true,
@@ -812,6 +817,7 @@ async function renderGenre(host, name) {
 
   await heroBlock(host, {
     artworkKey: genre.artworkKey,
+    kind: 'Crate divider',
     title: genre.name,
     meta: plural(genre.tracks.length, 'song'),
     tracks: genre.tracks,
@@ -869,6 +875,7 @@ async function renderPlaylist(host, id) {
 
   await heroBlock(host, {
     artworkKey: tracks[0] && tracks[0].artworkKey,
+    kind: 'Tape box',
     title: name,
     meta: plural(tracks.length, 'song') + (total ? ' · ' + formatDurationLong(total) : ''),
     tracks,

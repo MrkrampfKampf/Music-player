@@ -139,10 +139,14 @@ check('audio is actually playing', play1.playing === true);
 check('playhead advanced', play1.time > 0.3, String(play1.time));
 check('duration decoded', play1.duration > 5, String(play1.duration));
 check('queue is the album', play1.queue === 3, String(play1.queue));
-check('mini player visible', await page.isVisible('#mini'));
+check('player route present', await page.isVisible('#mini'));
 
 /* ------------------------------------------------------------- now playing */
-await page.click('#mini');
+// The player bar is not a bar any more: the room is how you get to the player.
+// What is left of #mini is the keyboard and screen-reader route, so that is
+// how it is exercised here.
+await page.focus('#mini');
+await page.keyboard.press('Enter');
 await page.waitForTimeout(900);
 check('now playing opened', await page.isVisible('#np'));
 const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
@@ -159,6 +163,13 @@ const liked = await page.evaluate(async () => {
 check('like saved to Liked Songs', liked.length === 1, JSON.stringify(liked));
 
 /* -------------------------------------------------------------------- next */
+// Where we are when the button is pressed, not where we were a few seconds
+// ago: the fixtures are six seconds long, so on a slow machine the track can
+// have ended by itself before we get here.
+const before = await page.evaluate(async () => {
+  const { player } = await import('./js/player.js');
+  return { index: player.index, title: player.current && player.current.title };
+});
 await page.click('#np-next');
 await page.waitForTimeout(2000);
 const play2 = await page.evaluate(async () => {
@@ -166,7 +177,9 @@ const play2 = await page.evaluate(async () => {
   return { title: player.current && player.current.title, playing: player.playing, index: player.index, time: player.currentTime };
 });
 console.log('  ', JSON.stringify(play2));
-check('advanced to next track', play2.index === 1 && play2.title !== play1.title, JSON.stringify(play2));
+check('advanced to next track',
+  play2.index === before.index + 1 && play2.title !== before.title,
+  JSON.stringify({ before, play2 }));
 check('still playing after skip', play2.playing === true);
 check('new track is playing audio', play2.time > 0.2, String(play2.time));
 
@@ -348,7 +361,13 @@ const eqOn = await page.evaluate(async () => {
 check('equaliser builds the audio graph', eqOn.enabled && eqOn.ctx && eqOn.filters === 10, JSON.stringify(eqOn));
 check('eq sliders rendered', (await page.locator('.eq-band').count()) === 10);
 
-const stillPlaying = await page.evaluate(async () => { const { player } = await import('./js/player.js'); return player.playing; });
+// Building the graph swaps the audio element into a MediaElementSource, which
+// can take a moment to settle. What matters is that it comes back, so give it
+// a couple of seconds rather than reading the flag once.
+const stillPlaying = await page.waitForFunction(async () => {
+  const { player } = await import('./js/player.js');
+  return player.playing === true;
+}, null, { timeout: 5000 }).then(() => true, () => false);
 check('audio survives the graph rebuild', stillPlaying === true);
 
 /* ------------------------------------------------------------- persistence */
