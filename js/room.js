@@ -229,13 +229,35 @@ function trackControl(node, attrs, pad, owner) {
 
 const ownerOf = (name) => spots.find((s) => s.name === name);
 
-const V = { x: 0, y: 0, z: 0 };
-function projectBox(node, camera, w, h, pad) {
-  node.updateWorldMatrix(true, false);
-  if (!node.geometry && !node.children.length) return null;
+/**
+ * The size of a thing, measured once.
+ *
+ * setFromObject walks an object's whole subtree every time it is called, which
+ * for eighteen objects on every frame is most of the work the room was doing.
+ * Nothing in the room changes shape, so each box is measured on the first
+ * frame and afterwards only moved by the object's own matrix.
+ */
+const localBoxes = new WeakMap();
+function worldBox(node) {
   const three = studio.three;
-  const boxOf = three.box.setFromObject(node);
-  if (boxOf.isEmpty()) return null;
+  let local = localBoxes.get(node);
+  if (!local) {
+    node.updateWorldMatrix(true, true);
+    const measured = new three.Box3().setFromObject(node);
+    if (measured.isEmpty()) return null;
+    // back into the object's own space, so it can be moved by its matrix later
+    const inverse = node.matrixWorld.clone().invert();
+    local = measured.clone().applyMatrix4(inverse);
+    localBoxes.set(node, local);
+  }
+  node.updateWorldMatrix(true, false);
+  return three.box.copy(local).applyMatrix4(node.matrixWorld);
+}
+
+function projectBox(node, camera, w, h, pad) {
+  const three = studio.three;
+  const boxOf = worldBox(node);
+  if (!boxOf) return null;
   let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
   for (let i = 0; i < 8; i++) {
     const p = three.corner.set(
@@ -257,8 +279,18 @@ function projectBox(node, camera, w, h, pad) {
   };
 }
 
-function layoutHotspots(w, h) {
+/**
+ * Where the buttons go.
+ *
+ * They only move when the camera does, so a still room lays them out once and
+ * then leaves them alone.
+ */
+let lastView = '';
+function layoutHotspots(w, h, force) {
   const camera = studio.camera;
+  const view = camera.position.toArray().concat(studio.aim.toArray(), [w, h]).join(',');
+  if (!force && view === lastView) return;
+  lastView = view;
   for (const spot of spots) {
     // Nearer objects sit above further ones, which is what occlusion means.
     spot.button.style.zIndex = String(100 - Math.round(spot.node.position.z * 4));
@@ -562,13 +594,13 @@ function resize() {
   studio.renderer.setSize(w, h, false);
   studio.composer.setPixelRatio(dpr);
   studio.composer.setSize(w, h);
-  studio.bloom.resolution.set(w, h);
+  studio.bloom.setSize(Math.max(1, w * 0.5), Math.max(1, h * 0.5));
   studio.camera.aspect = w / h;
   // A portrait frame is a narrow slice of a room, so it needs a wide lens to
   // hold the desk: the horizontal field is only about half the vertical one.
   studio.camera.fov = w / h < 0.75 ? 68 : 44;
   studio.camera.updateProjectionMatrix();
-  layoutHotspots(w, h);
+  layoutHotspots(w, h, true);
 }
 
 /**
@@ -655,7 +687,7 @@ function live() {
     state.frames++;
     state.camera = studio.camera.position.toArray();
 
-    // The buttons follow the objects, because the camera moves.
+    // The buttons follow the objects, but only when the camera has moved.
     layoutHotspots(room.clientWidth || 1, room.clientHeight || 1);
 
     // Nothing is rendered while the room is not the view: a studio you are not

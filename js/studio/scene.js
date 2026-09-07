@@ -17,7 +17,8 @@
 import {
   ACESFilmicToneMapping, AmbientLight, Box3, BoxGeometry, CapsuleGeometry, CatmullRomCurve3,
   CircleGeometry, Color, CylinderGeometry, DoubleSide, ExtrudeGeometry, Group, LatheGeometry,
-  Mesh, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PMREMGenerator,
+  InstancedMesh, Matrix4, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Object3D,
+  PCFSoftShadowMap, PMREMGenerator,
   PerspectiveCamera, PlaneGeometry, PointLight, Scene, Shape, SphereGeometry, SpotLight,
   SRGBColorSpace, TorusGeometry, TubeGeometry, Vector2, Vector3, WebGLRenderer,
 } from '../../vendor/three/three.module.js';
@@ -32,13 +33,25 @@ import * as tex from './textures.js';
 
 const V2 = (x, y) => new Vector2(x, y);
 
+/**
+ * A piece of timber.
+ *
+ * Every piece in the room is cut from the same grain and differs by tint and
+ * by how the grain is scaled onto it, which is also true of a room furnished
+ * from one supplier — and it means one 384-square texture instead of five.
+ */
 function wood(seed, tone, repeat, extra = {}) {
-  const t = tex.oak(seed, tone);
+  return shared('w' + tone + repeat.join('x') + JSON.stringify(extra), () => makeWood(tone, repeat, extra));
+}
+
+function makeWood(tone, repeat, extra) {
+  const t = tex.oak();
   const m = new MeshStandardMaterial({
     map: t.map.clone(),
     normalMap: t.normalMap.clone(),
     roughnessMap: t.roughnessMap.clone(),
     normalScale: V2(0.7, 0.7),
+    color: new Color(tone, tone, tone).convertSRGBToLinear(),
     roughness: 1,
     metalness: 0,
     ...extra,
@@ -49,6 +62,7 @@ function wood(seed, tone, repeat, extra = {}) {
   }
   return m;
 }
+
 
 function foamMat(repeat) {
   const t = tex.foam();
@@ -73,18 +87,90 @@ function clothMat(repeat) {
 }
 
 function alloy(colour = 0xb9b2a4, roughness = 0.34, metalness = 1) {
+  return shared('a' + colour + roughness + metalness, () => {
   const t = tex.brushed();
   return new MeshStandardMaterial({
     color: colour, roughness, metalness,
     roughnessMap: t.roughnessMap, normalMap: t.normalMap, normalScale: V2(0.3, 0.3),
   });
+  });
+}
+
+/**
+ * Many of the same thing, drawn once.
+ *
+ * A rack of records, the keys of a keyboard, the frets on a neck: dozens of
+ * identical shapes that differ only in where they are. Drawn as separate
+ * meshes they are dozens of draw calls; drawn as one instanced mesh they are
+ * one, which is the difference between a phone keeping up and not.
+ *
+ * `each(i, dummy)` positions the dummy for instance i and may return a colour.
+ */
+const dummy = new Object3D();
+function many(geometry, material, count, each) {
+  const mesh = new InstancedMesh(geometry, material, count);
+  let tinted = false;
+  for (let i = 0; i < count; i++) {
+    dummy.position.set(0, 0, 0);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, 1, 1);
+    const colour = each(i, dummy);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    if (colour != null) { mesh.setColorAt(i, new Color(colour)); tinted = true; }
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (tinted && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  return mesh;
 }
 
 /** A shape that is only there to be touched: it has size but no surface. */
 const untouchableGeom = () => new MeshStandardMaterial({ visible: false });
 
-const painted = (colour, roughness = 0.5, side) =>
-  new MeshStandardMaterial({ color: colour, roughness, metalness: 0.05, ...(side ? { side } : {}) });
+/**
+ * A painted or moulded surface.
+ *
+ * Never a flat fill: every one of these carries the fine tooth of its finish,
+ * so a lamp reflects off it as a soft patch rather than a hard disc. That one
+ * difference is most of what separates a photograph of a machine from a
+ * drawing of one.
+ */
+/**
+ * Materials are shared, not made per part.
+ *
+ * A hundred and sixty separate materials for a hundred and sixty parts means a
+ * hundred and sixty sets of uniforms and no chance of the renderer batching
+ * anything. Two parts painted the same colour are painted with the same paint.
+ */
+const paints = new Map();
+const shared = (key, build) => {
+  if (!paints.has(key)) paints.set(key, build());
+  return paints.get(key);
+};
+
+const painted = (colour, roughness = 0.5, side) => shared('p' + colour + roughness + side, () => {
+  const m = tex.micro();
+  return new MeshStandardMaterial({
+    color: colour,
+    roughness,
+    metalness: 0.05,
+    normalMap: m.normalMap,
+    normalScale: V2(0.32, 0.32),
+    roughnessMap: m.roughnessMap,
+    ...(side ? { side } : {}),
+  });
+});
+
+/** Moulded plastic and painted steel, with a clear finish over it. */
+const lacquer = (colour, roughness = 0.34) => shared('l' + colour + roughness, () => {
+  const m = tex.micro();
+  return new MeshPhysicalMaterial({
+    color: colour, roughness, metalness: 0.04,
+    clearcoat: 0.7, clearcoatRoughness: 0.28,
+    normalMap: m.normalMap, normalScale: V2(0.26, 0.26),
+    roughnessMap: m.roughnessMap,
+  });
+});
 
 const glass = () => new MeshPhysicalMaterial({
   color: 0x0b0d0e, roughness: 0.06, metalness: 0, transmission: 0,
@@ -112,6 +198,38 @@ function shadowy(mesh, cast = true, receive = true) {
   mesh.castShadow = cast;
   mesh.receiveShadow = receive;
   return mesh;
+}
+
+/**
+ * A box with its edges taken off.
+ *
+ * A perfect right-angled edge is the loudest thing that says "modelled": every
+ * real panel is either rounded over or has a chamfer milled on it, and that
+ * narrow face is where the lamp catches. Cheap, and worth more than any amount
+ * of extra texture.
+ */
+function chamferBox(w, h, d, m, r = 0.005) {
+  // The outline is the box seen from above (w by d); the extrusion is its
+  // height, so the chamfer runs round every edge once it is stood upright.
+  const shape = new Shape();
+  const x = -w / 2;
+  const y = -d / 2;
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + d - r);
+  shape.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+  shape.lineTo(x + r, y + d);
+  shape.quadraticCurveTo(x, y + d, x, y + d - r);
+  shape.lineTo(x, y + r);
+  shape.quadraticCurveTo(x, y, x + r, y);
+  const geo = new ExtrudeGeometry(shape, {
+    depth: Math.max(0.001, h - r * 2), bevelEnabled: true, bevelSize: r, bevelThickness: r,
+    bevelSegments: 1, curveSegments: 2,
+  });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -(h - r * 2) / 2 - r, 0);
+  return new Mesh(geo, m);
 }
 
 /** A rounded slab: what most equipment actually is. */
@@ -178,7 +296,7 @@ export function buildStudio(canvas) {
     const t = tex.concrete();
     const m = new MeshStandardMaterial({
       map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap,
-      normalScale: V2(0.6, 0.6), roughness: 1, metalness: 0, color: 0x6b6055,
+      normalScale: V2(0.5, 0.5), roughness: 0.44, metalness: 0.02, color: 0x4a423a,
     });
     for (const k of ['map', 'normalMap', 'roughnessMap']) m[k].repeat.set(4, 4);
     return m;
@@ -198,13 +316,29 @@ export function buildStudio(canvas) {
   scene.add(shadowy(place(new Mesh(new PlaneGeometry(W, H), wallMat), 0, H / 2, BACK), false, true));
   scene.add(shadowy(place(new Mesh(new PlaneGeometry(D, H), wallMat.clone()), -W / 2, H / 2, BACK + D / 2, 0, Math.PI / 2), false, true));
   scene.add(shadowy(place(new Mesh(new PlaneGeometry(D, H), wallMat.clone()), W / 2, H / 2, BACK + D / 2, 0, -Math.PI / 2), false, true));
-  scene.add(place(new Mesh(new PlaneGeometry(W, D), painted(0x2b2521, 0.95)), 0, H, BACK + D / 2, Math.PI / 2));
+  const ceilMat = (() => {
+    const t = tex.plaster();
+    const m = new MeshStandardMaterial({
+      map: t.map.clone(), normalMap: t.normalMap.clone(), roughnessMap: t.roughnessMap.clone(),
+      normalScale: V2(0.3, 0.3), roughness: 1, metalness: 0, color: 0x35302b,
+    });
+    for (const k of ['map', 'normalMap', 'roughnessMap']) m[k].repeat.set(3, 5);
+    return m;
+  })();
+  scene.add(place(new Mesh(new PlaneGeometry(W, D), ceilMat), 0, H, BACK + D / 2, Math.PI / 2));
 
   /* -------------------------------------------------- acoustic treatment */
 
-  const foam1 = foamMat([2, 3]);
+  // Panels get hung over years, from different boxes, and fade differently.
+  let panelSeed = 0;
   const addPanel = (x, y, z, w, h, ry = 0) => {
-    const p = shadowy(place(box(w, h, 0.075, foam1), x, y, z, 0, ry));
+    const t = tex.foam();
+    const shade = [0x3a352e, 0x33302a, 0x413a31, 0x2f2c27][panelSeed++ % 4];
+    const m = new MeshStandardMaterial({
+      map: t.map, normalMap: t.normalMap, normalScale: V2(1.5, 1.5),
+      roughness: 0.98, metalness: 0, color: shade,
+    });
+    const p = shadowy(place(box(w, h, 0.075, m), x, y, z, 0, ry));
     scene.add(p);
     return p;
   };
@@ -219,8 +353,8 @@ export function buildStudio(canvas) {
 
   /* ------------------------------------------------------------- the desk */
 
-  const deskWood = wood(3, 1, [3.2, 0.8]);
-  const deskDark = wood(11, 0.72, [3.2, 0.5]);
+  const deskWood = wood(3, 0.66, [3.2, 0.8], { roughness: 0.62 });
+  const deskDark = wood(11, 0.5, [3.2, 0.5], { roughness: 0.7 });
   const DESK_TOP = 0.79;
   const DESK_FRONT = -1.36;
   const DESK_BACK = BACK + 0.12;
@@ -229,12 +363,12 @@ export function buildStudio(canvas) {
 
   const desk = new Group();
   // the worktop, with a lipped front edge
-  desk.add(shadowy(place(box(DESK_W, 0.055, DESK_DEPTH, deskWood),
+  desk.add(shadowy(place(chamferBox(DESK_W, 0.055, DESK_DEPTH, deskWood, 0.004),
     -0.06, DESK_TOP, (DESK_FRONT + DESK_BACK) / 2)));
   desk.add(shadowy(place(box(DESK_W, 0.1, 0.03, deskWood),
     -0.06, DESK_TOP - 0.04, DESK_FRONT + 0.005)));
   // the front panel, vertical boards, set back so the top overhangs it
-  desk.add(shadowy(place(box(DESK_W, DESK_TOP - 0.12, 0.05, wood(7, 0.92, [3.2, 0.7])),
+  desk.add(shadowy(place(box(DESK_W, DESK_TOP - 0.12, 0.05, wood(7, 0.58, [3.2, 0.7], { roughness: 0.72 })),
     -0.06, (DESK_TOP - 0.12) / 2 + 0.06, DESK_FRONT - 0.06)));
   desk.add(shadowy(place(box(DESK_W, 0.06, 0.5, painted(0x0b0908, 0.9)),
     -0.06, 0.04, DESK_FRONT - 0.3), false, true));
@@ -251,7 +385,7 @@ export function buildStudio(canvas) {
   scene.add(new AmbientLight(0x252830, 0.4));
   // The light that has bounced off the walls once. Without it a room lit only
   // by spots is a set of pools in a void.
-  const bounce = new PointLight(0xffc48c, 2.4, 8, 1.6);
+  const bounce = new PointLight(0xffc48c, 3.4, 9, 1.5);
   bounce.position.set(0, H - 0.5, BACK + 1.3);
   scene.add(bounce);
 
@@ -276,18 +410,31 @@ export function buildStudio(canvas) {
     spots.push(s);
     return s;
   };
-  addSpot(-0.95, -0.95, -1.05, BACK + 0.5, 44, 0.56, 0xffc078, 0.8, true);
-  addSpot(0.85, -0.2, 0.75, -1.3, 38, 0.52, 0xffc078, 0.8, true);
-  addSpot(0.0, -1.8, 0.0, BACK + 0.1, 26, 0.46, 0xffb968);
-  addSpot(-1.15, -1.85, -1.2, BACK + 0.05, 24, 0.42, 0xffb968, 1.75);
-  addSpot(1.1, -1.85, 1.15, BACK + 0.05, 24, 0.42, 0xffb968, 1.75);
+  addSpot(-0.95, -0.95, -1.05, BACK + 0.5, 56, 0.56, 0xffc078, 0.8, true);
+  addSpot(0.85, -0.2, 0.75, -1.3, 48, 0.52, 0xffc078, 0.8, true);
+  // One wall washer rather than three: a fragment shader runs through every
+  // light in the scene, and the wall cannot tell the difference. The other two
+  // fixtures are still in the ceiling, because a room with one downlight in it
+  // looks like a room with two downlights missing.
+  addSpot(0.0, -1.8, 0.0, BACK + 0.1, 52, 0.62, 0xffb968, 1.5);
+  const fixture = (x, z) => {
+    scene.add(place(new Mesh(new CylinderGeometry(0.078, 0.062, 0.055, 20, 1, true),
+      painted(0x14100e, 0.55, DoubleSide)), x, H - 0.028, z));
+    scene.add(place(new Mesh(new CircleGeometry(0.058, 18), lit(0xffd9a4, 1.5)), x, H - 0.052, z, Math.PI / 2));
+  };
+  fixture(-1.15, -1.85);
+  fixture(1.1, -1.85);
+  fixture(-0.55, -3.1);
+  fixture(0.6, -3.1);
 
   /** A strip of light under a shelf: the thing that makes a studio look warm. */
   const strips = [];
   const addStrip = (x, y, z, w, colour = 0xffb15c, power = 1.1) => {
     const bar = place(new Mesh(new BoxGeometry(w, 0.01, 0.016), lit(colour, 1.5)), x, y, z);
     scene.add(bar);
-    const n = Math.max(2, Math.round(w / 0.9));
+    // One lamp per strip is enough: the strip itself is emissive, and the
+    // pool it throws is what the light is for.
+    const n = 1;
     for (let i = 0; i < n; i++) {
       const p = new PointLight(colour, power, 2.2, 1.8);
       p.position.set(x - w / 2 + (w * (i + 0.5)) / n, y - 0.03, z + 0.05);
@@ -310,11 +457,12 @@ export function buildStudio(canvas) {
     g.add(face);
     parts.tunerFace = face;
     // the scale, drawn as ticks and a needle
-    for (let i = 0; i < 22; i++) {
-      const h = i % 5 === 0 ? 0.05 : 0.03;
-      g.add(place(new Mesh(new PlaneGeometry(0.004, h), painted(0x1a1512, 0.9)),
-        -0.55 + i * 0.047, 0.06 - (0.05 - h) / 2, 0.1695));
-    }
+    const tick = new PlaneGeometry(0.004, 0.05);
+    g.add(many(tick, painted(0x1a1512, 0.9), 22, (i, d) => {
+      const long = i % 5 === 0;
+      d.position.set(-0.55 + i * 0.047, 0.06 - (long ? 0 : 0.01), 0.1695);
+      d.scale.y = long ? 1 : 0.6;
+    }));
     const needle = place(new Mesh(new PlaneGeometry(0.006, 0.17), lit(0xff5a34, 2.4)), -0.3, 0.05, 0.171);
     g.add(needle);
     parts.tunerNeedle = needle;
@@ -378,10 +526,30 @@ export function buildStudio(canvas) {
     const g = new Group();
     const body = shadowy(place(box(1.15, 0.09, 0.5, painted(0x22201d, 0.55)), 0, 0.045, 0));
     g.add(body);
+
+    // What is silkscreened on the panel: the band each fader works on, the
+    // channel marks over the meters, and the name of the knob.
+    const legend = tex.printed('console', 512, 128, (c, w, h) => {
+      c.clearRect(0, 0, w, h);
+      c.fillStyle = 'rgba(26,22,18,0.9)';
+      c.textAlign = 'center';
+      c.font = tex.silk(18);
+      ['31', '160', '1k', '6k', '16k'].forEach((t, i) => c.fillText(t, 155 + i * 74, 118));
+      c.textAlign = 'left';
+      c.font = tex.silk(15);
+      c.fillText('FADE', 22, 118);
+      c.fillStyle = 'rgba(26,22,18,0.5)';
+      c.fillText('L', 176, 26);
+      c.fillText('R', 344, 26);
+    });
     // the panel is raked, the way a desk you actually reach across is
-    const panel = place(slab(1.1, 0.46, 0.018, 0.008, alloy(0xa8a294, 0.38, 0.85)), 0, 0.135, 0.02, -1.16);
+    const panel = place(slab(1.1, 0.46, 0.018, 0.008, alloy(0x6f6a60, 0.46, 0.8)), 0, 0.135, 0.02, -1.16);
     g.add(shadowy(panel));
     parts.consolePanel = panel;
+    // the silkscreen: band frequencies under the faders, and the channel marks
+    g.add(place(new Mesh(new PlaneGeometry(1.04, 0.26),
+      new MeshStandardMaterial({ map: legend, transparent: true, roughness: 0.55, metalness: 0 })),
+    0, 0.117, 0.055, -1.16));
 
     // two backlit meter windows
     const meters = [];
@@ -392,9 +560,7 @@ export function buildStudio(canvas) {
       needle.geometry.translate(0, -0.037, 0);
       g.add(needle);
       meters.push(needle);
-      const p = new PointLight(0xffb959, 1.4, 1.1, 1.8);
-      p.position.set(mx, 0.3, 0.16);
-      g.add(p);
+      // No lamp of its own: the window is emissive and the bloom carries it.
     }
     parts.meters = meters;
 
@@ -429,9 +595,9 @@ export function buildStudio(canvas) {
 
   {
     const g = new Group();
-    const plinth = shadowy(place(box(0.46, 0.075, 0.37, wood(23, 0.85, [0.6, 0.5])), 0, 0.037, 0));
+    const plinth = shadowy(place(chamferBox(0.46, 0.075, 0.37, wood(23, 0.6, [0.6, 0.5]), 0.005), 0, 0.037, 0));
     g.add(plinth);
-    const top = place(box(0.44, 0.008, 0.35, alloy(0x8d8779, 0.4, 0.7)), 0, 0.078, 0);
+    const top = place(box(0.44, 0.008, 0.35, alloy(0x746f64, 0.46, 0.7)), 0, 0.078, 0);
     g.add(shadowy(top));
     // the platter, machined, sitting in its well
     g.add(place(new Mesh(new CylinderGeometry(0.155, 0.155, 0.012, 60), painted(0x0a0908, 0.85)), -0.04, 0.079, 0.005));
@@ -442,7 +608,32 @@ export function buildStudio(canvas) {
     record.add(place(new Mesh(new CylinderGeometry(0.146, 0.146, 0.0022, 72), new MeshStandardMaterial({
       color: 0x080707, roughness: 0.22, metalness: 0.0, clearcoat: 1,
     })), 0, 0, 0));
-    record.add(place(new Mesh(new CylinderGeometry(0.049, 0.049, 0.0025, 40), painted(0xb8452c, 0.65)), 0, 0.0004, 0));
+    const labelArt = tex.printed('label', 256, 256, (c, w) => {
+      c.fillStyle = '#b8452c';
+      c.fillRect(0, 0, w, w);
+      c.translate(w / 2, w / 2);
+      c.fillStyle = 'rgba(255,236,206,0.9)';
+      c.textAlign = 'center';
+      c.font = tex.silk(15);
+      c.fillText('RESONATE', 0, -58);
+      c.font = '600 30px ui-serif, Georgia, serif';
+      c.fillText('SIDE A', 0, 14);
+      c.font = tex.silk(13);
+      c.fillText('33 \u2153 RPM', 0, 44);
+      c.fillText('LONG PLAY', 0, 70);
+      c.strokeStyle = 'rgba(255,226,190,0.45)';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(0, 0, 104, 0, Math.PI * 2);
+      c.stroke();
+      c.fillStyle = '#0a0908';
+      c.beginPath();
+      c.arc(0, 0, 9, 0, Math.PI * 2);
+      c.fill();
+    });
+    const labelMat = new MeshStandardMaterial({ map: labelArt, roughness: 0.68, metalness: 0 });
+    record.add(place(new Mesh(new CylinderGeometry(0.049, 0.049, 0.0025, 40),
+      [painted(0xb8452c, 0.65), labelMat, labelMat]), 0, 0.0004, 0));
     record.add(place(new Mesh(new CylinderGeometry(0.0035, 0.0035, 0.012, 12), alloy(0xd4ccbb, 0.25)), 0, 0.006, 0));
     record.position.set(-0.04, 0.097, 0.005);
     g.add(record);
@@ -462,6 +653,19 @@ export function buildStudio(canvas) {
       g.add(place(slab(0.036, 0.016, 0.008, 0.002, painted(i ? 0x2b2724 : 0x3d3a35, 0.5)),
         -0.17 + i * 0.045, 0.084, 0.152, -Math.PI / 2));
     }
+    const plate = tex.printed('deckplate', 256, 64, (c, w, h) => {
+      c.fillStyle = '#221d19';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#d4a04a';
+      c.textAlign = 'left';
+      c.font = tex.silk(21);
+      c.fillText('RESONATE', 12, 42);
+      c.fillStyle = 'rgba(212,160,74,0.55)';
+      c.font = tex.silk(17);
+      c.fillText('DP-01', 168, 42);
+    });
+    g.add(place(new Mesh(new PlaneGeometry(0.09, 0.0225),
+      new MeshStandardMaterial({ map: plate, roughness: 0.6 })), 0.11, 0.0825, 0.135, -Math.PI / 2));
     const deckLed = place(new Mesh(new SphereGeometry(0.004, 10, 8), lit(0xffb15c, 3)), -0.2, 0.086, 0.152);
     g.add(deckLed);
     parts.deckLed = deckLed;
@@ -481,8 +685,8 @@ export function buildStudio(canvas) {
 
   {
     const g = new Group();
-    g.add(shadowy(place(box(0.62, 0.42, 0.2, painted(0x1b1917, 0.5)), 0, 0, 0)));
-    g.add(place(slab(0.58, 0.38, 0.014, 0.006, alloy(0x8a8478, 0.42, 0.8)), 0, 0.01, 0.104));
+    g.add(shadowy(place(chamferBox(0.62, 0.42, 0.2, lacquer(0x1b1917, 0.44), 0.006), 0, 0, 0)));
+    g.add(place(slab(0.58, 0.38, 0.014, 0.006, alloy(0x6b665c, 0.48, 0.8)), 0, 0.01, 0.104));
     const reels = [];
     for (const [rx, rr] of [[-0.14, 0.11], [0.15, 0.075]]) {
       const hub = new Group();
@@ -508,7 +712,7 @@ export function buildStudio(canvas) {
     g.position.set(0.58, 0.63, DESK_FRONT + 0.42);
     g.rotation.y = -0.14;
     // it sits on a low crate of its own, on the floor in front of the desk
-    scene.add(shadowy(place(box(0.7, 0.62, 0.34, wood(31, 0.8, [0.9, 0.8])), 0.58, 0.32, DESK_FRONT + 0.42, 0, -0.14)));
+    scene.add(shadowy(place(chamferBox(0.7, 0.62, 0.34, wood(31, 0.55, [0.9, 0.8]), 0.006), 0.58, 0.32, DESK_FRONT + 0.42, 0, -0.14)));
     scene.add(g);
     pickables.push({ name: 'add', label: 'Tape machine. Add music.', node: g,
       size: [0.68, 0.5, 0.28], look: [0.58, 0.63, DESK_FRONT + 0.42], from: [0.45, 1.22, 0.9] });
@@ -518,11 +722,11 @@ export function buildStudio(canvas) {
 
   {
     const g = new Group();
-    const crateWood = wood(41, 0.78, [0.7, 0.5]);
-    g.add(shadowy(place(box(0.44, 0.34, 0.02, crateWood), 0, 0, 0.19)));
-    g.add(shadowy(place(box(0.44, 0.34, 0.02, crateWood), 0, 0, -0.19)));
-    g.add(shadowy(place(box(0.02, 0.34, 0.4, crateWood), -0.22, 0, 0)));
-    g.add(shadowy(place(box(0.02, 0.34, 0.4, crateWood), 0.22, 0, 0)));
+    const crateWood = wood(41, 0.52, [0.7, 0.5]);
+    g.add(shadowy(place(chamferBox(0.44, 0.34, 0.02, crateWood, 0.004), 0, 0, 0.19)));
+    g.add(shadowy(place(chamferBox(0.44, 0.34, 0.02, crateWood, 0.004), 0, 0, -0.19)));
+    g.add(shadowy(place(chamferBox(0.02, 0.34, 0.4, crateWood, 0.004), -0.22, 0, 0)));
+    g.add(shadowy(place(chamferBox(0.02, 0.34, 0.4, crateWood, 0.004), 0.22, 0, 0)));
     g.add(place(box(0.42, 0.02, 0.38, painted(0x0e0c0b, 0.8)), 0, -0.16, 0));
     // sleeves standing in it, leaning back, all slightly different
     const tints = [0x2c241c, 0x4e3a27, 0x7a4a2c, 0x33293c, 0x5c4a2a, 0x1f2a2c, 0x6b3a24];
@@ -568,14 +772,16 @@ export function buildStudio(canvas) {
     const board = shadowy(place(box(0.052, 0.5, 0.008, painted(0x1c130c, 0.42)), 0, 0.5, 0.047));
     g.add(board);
     parts.fretboard = board;
-    for (let i = 1; i < 13; i++) {
-      g.add(place(box(0.052, 0.0018, 0.002, alloy(0xd8d2c4, 0.22)), 0, 0.26 + i * 0.038, 0.0515));
-    }
+    const fret = new BoxGeometry(0.052, 0.0018, 0.002);
+    g.add(many(fret, alloy(0xd8d2c4, 0.22), 12, (i, d) => {
+      d.position.set(0, 0.26 + (i + 1) * 0.038, 0.0515);
+    }));
     g.add(shadowy(place(box(0.07, 0.1, 0.02, wood(61, 0.5, [0.3, 0.3])), 0, 0.79, 0.028, 0.16)));
-    for (let i = 0; i < 6; i++) {
-      g.add(place(new Mesh(new CylinderGeometry(0.005, 0.005, 0.024, 10), alloy(0xcfc7b6, 0.25)),
-        (i < 3 ? -0.042 : 0.042), 0.755 + (i % 3) * 0.03, 0.028, 0, 0, Math.PI / 2));
-    }
+    const peg = new CylinderGeometry(0.005, 0.005, 0.024, 8);
+    g.add(many(peg, alloy(0xcfc7b6, 0.25), 6, (i, d) => {
+      d.position.set(i < 3 ? -0.042 : 0.042, 0.755 + (i % 3) * 0.03, 0.028);
+      d.rotation.z = Math.PI / 2;
+    }));
     // bridge and strings
     g.add(place(box(0.11, 0.022, 0.01, painted(0x241608, 0.45)), 0, -0.085, 0.058));
     const strings = [];
@@ -616,11 +822,12 @@ export function buildStudio(canvas) {
     // shock mount and capsule
     const head = new Group();
     head.add(place(new Mesh(new TorusGeometry(0.058, 0.005, 8, 30), alloy(0x9a9488, 0.3)), 0, 0, 0));
-    for (let i = 0; i < 8; i++) {
+    const pin = new CylinderGeometry(0.0012, 0.0012, 0.052, 5);
+    head.add(many(pin, painted(0x8a8478, 0.5), 8, (i, d) => {
       const a = (i / 8) * Math.PI * 2;
-      head.add(place(new Mesh(new CylinderGeometry(0.0012, 0.0012, 0.052, 6), painted(0x8a8478, 0.5)),
-        Math.cos(a) * 0.04, Math.sin(a) * 0.04, -0.012, Math.PI / 2, 0, 0));
-    }
+      d.position.set(Math.cos(a) * 0.04, Math.sin(a) * 0.04, -0.012);
+      d.rotation.x = Math.PI / 2;
+    }));
     const capsule = place(new Mesh(new CapsuleGeometry(0.026, 0.075, 8, 22), painted(0x121110, 0.42)), 0, 0, 0);
     head.add(shadowy(capsule));
     head.add(place(new Mesh(new CylinderGeometry(0.027, 0.027, 0.055, 28), clothMat([3, 1])), 0, 0.03, 0));
@@ -669,15 +876,15 @@ export function buildStudio(canvas) {
   {
     const g = new Group();
     g.add(shadowy(place(box(1.02, 0.05, 0.24, painted(0x161412, 0.5)), 0, 0, 0)));
-    for (let i = 0; i < 30; i++) {
-      g.add(place(box(0.0295, 0.012, 0.15, painted(0xdcd6c8, 0.36)), -0.49 + i * 0.0335, 0.03, 0.03));
-    }
-    for (let i = 0; i < 30; i++) {
-      if ([2, 6, 9, 13, 16, 20, 23, 27].includes(i % 30)) continue;
-      if (i % 7 === 3 || i % 7 === 6) {
-        g.add(place(box(0.017, 0.014, 0.095, painted(0x100e0d, 0.42)), -0.473 + i * 0.0335, 0.04, -0.005));
-      }
-    }
+    const whiteKey = new BoxGeometry(0.0295, 0.012, 0.15);
+    g.add(many(whiteKey, painted(0xdcd6c8, 0.36), 30, (i, d) => {
+      d.position.set(-0.49 + i * 0.0335, 0.03, 0.03);
+    }));
+    const blackAt = [1, 2, 4, 5, 6, 8, 9, 11, 12, 13, 15, 16, 18, 19, 20, 22, 23, 25, 26, 27];
+    const blackKey = new BoxGeometry(0.017, 0.014, 0.095);
+    g.add(many(blackKey, painted(0x100e0d, 0.42), blackAt.length, (i, d) => {
+      d.position.set(-0.473 + blackAt[i] * 0.0335, 0.04, -0.005);
+    }));
     g.position.set(-0.52, BRIDGE + 0.05, DESK_BACK + 0.24);
     g.rotation.y = 0.04;
     scene.add(g);
@@ -719,14 +926,15 @@ export function buildStudio(canvas) {
 
     const pot = place(new Mesh(new CylinderGeometry(0.075, 0.058, 0.11, 24), painted(0x30291f, 0.85)), 1.2, DESK_TOP + 0.083, DESK_BACK + 0.24);
     scene.add(shadowy(pot));
-    for (let i = 0; i < 14; i++) {
+    const leafGeo = new SphereGeometry(0.045, 8, 6);
+    const leaves = many(leafGeo, painted(0x2c4326, 0.8), 14, (i, d) => {
       const a = (i / 14) * Math.PI * 2;
-      const leaf = place(new Mesh(new SphereGeometry(0.045, 10, 8), painted(0x2c4326, 0.8)),
-        1.2 + Math.cos(a) * 0.07, DESK_TOP + 0.16 + (i % 4) * 0.035, DESK_BACK + 0.24 + Math.sin(a) * 0.06);
-      leaf.scale.set(1.5, 0.42, 1.1);
-      leaf.rotation.set(0.3, a, 0.2);
-      scene.add(shadowy(leaf, true, false));
-    }
+      d.position.set(1.2 + Math.cos(a) * 0.07,
+        DESK_TOP + 0.16 + (i % 4) * 0.035, DESK_BACK + 0.24 + Math.sin(a) * 0.06);
+      d.rotation.set(0.3, a, 0.2);
+      d.scale.set(1.5, 0.42, 1.1);
+    });
+    scene.add(shadowy(leaves, true, false));
   }
 
   // What someone left on the desk.
@@ -763,18 +971,25 @@ export function buildStudio(canvas) {
     const shelf = shadowy(place(box(1.0, 0.04, 0.24, wood(67, 0.85, [1.3, 0.4])), 0.6, 2.24, BACK + 0.13));
     scene.add(shelf);
     const tints = [0x2c241c, 0x54402c, 0x7a4a2c, 0x33293c, 0x5c4a2a, 0x243033, 0x6b3a24, 0x3c3128];
-    for (let i = 0; i < 22; i++) {
-      const s = place(box(0.012, 0.31, 0.31, painted(tints[i % tints.length], 0.8)),
-        0.2 + i * 0.03, 2.42, BACK + 0.14, 0, 0, (i > 18 ? 0.16 : 0));
-      scene.add(shadowy(s));
-    }
+    const sleeve = new BoxGeometry(0.012, 0.31, 0.31);
+    const rack = many(sleeve, painted(0xffffff, 0.8), 22, (i, d) => {
+      d.position.set(0.2 + i * 0.03, 2.42, BACK + 0.14);
+      d.rotation.z = i > 18 ? 0.16 : 0;
+      return tints[i % tints.length];
+    });
+    scene.add(shadowy(rack));
   }
 
   /* --------------------------------------------------------------- compose */
 
+  // Everything that casts a shadow in this room is furniture: it never moves,
+  // so the shadow maps are rendered on the first frame and then left alone.
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
+
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new Vector2(1, 1), 0.5, 0.7, 0.94);
+  const bloom = new UnrealBloomPass(new Vector2(1, 1), 0.46, 0.7, 0.94);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
@@ -783,6 +998,6 @@ export function buildStudio(canvas) {
     aim, home,
     // scratch objects the hotspot layer projects with, kept here so the frame
     // loop never allocates
-    three: { Vector3, box: new Box3(), corner: new Vector3() },
+    three: { Vector3, Box3, box: new Box3(), corner: new Vector3() },
   };
 }

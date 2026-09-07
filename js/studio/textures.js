@@ -141,11 +141,11 @@ const once = (key, build) => {
  * a dark line is also a slightly rougher, slightly lower one.
  */
 export function oak(seed = 3, tone = 1) {
-  return once('oak' + seed + '-' + tone, () => {
-    const size = 512;
-    const streak = fbm(seed, 4, 3);       // the long lines, stretched along U
-    const figure = fbm(seed + 31, 3, 2);  // the occasional cathedral
-    const pores = fbm(seed + 77, 3, 24);  // open pores, which oak has a lot of
+  return once('oak', () => {
+    const size = 384;
+    const streak = fbm(3, 4, 3);       // the long lines, stretched along U
+    const figure = fbm(34, 3, 2);      // the occasional cathedral
+    const pores = fbm(80, 3, 24);      // open pores, which oak has a lot of
     const { canvas, ctx } = surface(size);
     const image = ctx.createImageData(size, size);
     const height = new Float32Array(size * size);
@@ -168,9 +168,9 @@ export function oak(seed = 3, tone = 1) {
         // Oak is a narrow band of browns; the contrast between early and late
         // wood is much smaller than it looks in a photograph.
         const light = 0.72 + (1 - g) * 0.4;
-        image.data[i] = Math.min(255, 132 * light) * tone;
-        image.data[i + 1] = Math.min(255, 96 * light) * tone;
-        image.data[i + 2] = Math.min(255, 61 * light) * tone;
+        image.data[i] = Math.min(255, 132 * light);
+        image.data[i + 1] = Math.min(255, 96 * light);
+        image.data[i + 2] = Math.min(255, 61 * light);
         image.data[i + 3] = 255;
 
         // Pores are the only real relief; the grain itself is nearly flat.
@@ -375,6 +375,87 @@ export function concrete() {
     };
   });
 }
+
+/**
+ * The fine detail every made object has and no flat colour does: the texture
+ * of the paint, the swirl left by a polishing wheel, the dust that has settled
+ * since. It is nearly invisible on its own and it is the whole difference
+ * between a surface and a fill, because it breaks up the specular highlight —
+ * a perfectly smooth panel reflects a lamp as a hard disc, and nothing real
+ * does that.
+ */
+export function micro() {
+  return once('micro', () => {
+    const size = 256;
+    const paint = fbm(1301, 4, 30);   // the tooth of the finish
+    const swirl = fbm(1302, 3, 6);    // wider unevenness, from wear
+    const height = new Float32Array(size * size);
+    const rough = new Float32Array(size * size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const a = paint(x / size, y / size);
+        const b = swirl(x / size, y / size);
+        height[y * size + x] = a * 0.8 + b * 0.2;
+        rough[y * size + x] = 0.5 + (a - 0.5) * 0.34 + (b - 0.5) * 0.5;
+      }
+    }
+    // Four tiles across whatever it is put on: on a knob that is the tooth of
+    // the paint, on a panel it is the unevenness of the finish. It is the same
+    // texture either way, which is why every made thing in the room agrees.
+    return {
+      normalMap: finish(normalFrom(height, size, 0.34), [4, 4], false),
+      roughnessMap: finish(grayCanvas(rough, size), [4, 4], false),
+    };
+  });
+}
+
+/**
+ * Dust, for the surfaces that face the ceiling. It sits in patches, it is
+ * lighter than what it settles on, and it kills the shine.
+ */
+export function dust() {
+  return once('dust', () => {
+    const size = 256;
+    const patch = fbm(1401, 4, 5);
+    const speck = fbm(1402, 3, 40);
+    const rough = new Float32Array(size * size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const d = Math.max(0, patch(x / size, y / size) - 0.42) * 1.7 + speck(x / size, y / size) * 0.2;
+        rough[y * size + x] = 0.55 + Math.min(0.45, d);
+      }
+    }
+    return { roughnessMap: finish(grayCanvas(rough, size), [1, 1], false) };
+  });
+}
+
+/**
+ * Print.
+ *
+ * Real equipment is covered in writing: a maker's plate, a channel number, a
+ * frequency scale, the label in the middle of a record. Blank panels are one
+ * of the loudest signals that a thing was modelled rather than made, and text
+ * is nearly free to draw, so the room gets its lettering.
+ *
+ * `draw` receives a 2D context and the canvas size and may do anything.
+ */
+export function printed(key, w, h, draw) {
+  return once('print-' + key, () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    draw(ctx, w, h);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    texture.anisotropy = 8;
+    return texture;
+  });
+}
+
+/** The mono face the equipment in this room is silkscreened in. */
+export const SILK = '600 __PXpx ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+export const silk = (px) => SILK.replace('__PX', String(px));
 
 /** The scale a normal map should be read at, per material. */
 export const NORMAL_SCALE = new Vector2(1, 1);

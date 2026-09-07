@@ -102,6 +102,36 @@ const pushed = await page.evaluate(() => {
 });
 check('keys depress and spring back', pushed.on && pushed.off, JSON.stringify(pushed));
 
+/* The equaliser is ten vertical faders. They are range inputs turned on their
+   side, because a vertical writing mode leaves the input 26 px tall however it
+   is styled and only the top of the slot answers a finger. */
+await page.evaluate(async () => {
+  const { closePlayer } = await import('./js/nowplaying.js');
+  closePlayer();
+  const { renderSettings } = await import('./js/settings.js');
+  for (const v of document.querySelectorAll('.view')) v.hidden = v.dataset.view !== 'settings';
+  await renderSettings(document.getElementById('settings-body'));
+});
+await page.waitForTimeout(700);
+const eqSwitch = page.locator('[data-view="settings"] .setting', { hasText: 'Equaliser' }).locator('.switch');
+if (await eqSwitch.count()) { await eqSwitch.first().click(); await page.waitForTimeout(600); }
+
+const slotBox = await page.locator('.eq-band .slot').first().boundingBox();
+const inputBox = await page.locator('.eq-band input').first().boundingBox();
+check('a fader covers the whole of its slot',
+  inputBox && slotBox && inputBox.height > slotBox.height * 0.9,
+  JSON.stringify({ slot: slotBox && Math.round(slotBox.height), input: inputBox && Math.round(inputBox.height) }));
+
+const gainBefore = await page.evaluate(async () => (await import('./js/settings.js')).settings.eqGains[0]);
+await page.mouse.move(slotBox.x + slotBox.width / 2, slotBox.y + slotBox.height * 0.75);
+await page.mouse.down();
+await page.mouse.move(slotBox.x + slotBox.width / 2, slotBox.y + slotBox.height * 0.15, { steps: 10 });
+await page.mouse.up();
+await page.waitForTimeout(500);
+const gainAfter = await page.evaluate(async () => (await import('./js/settings.js')).settings.eqGains[0]);
+check('dragging a fader moves the band it is labelled with', gainAfter > gainBefore + 2,
+  gainBefore + ' -> ' + gainAfter);
+
 log('');
 log('errors: ' + errors.length);
 for (const e of [...new Set(errors)].slice(0, 5)) log('  ' + e);

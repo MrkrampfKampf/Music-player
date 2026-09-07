@@ -64,6 +64,7 @@ await page.route('**/metadata/gd1977', (route) => route.fulfill({
 
 await page.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
+
 await open(page, 'search');
 await page.waitForTimeout(400);
 check('search offers both scopes', (await page.locator('#search-tabs [data-scope]').count()) === 2);
@@ -86,6 +87,32 @@ check('clock durations are read correctly', /5:30/.test(sheet) && /7:12/.test(sh
 check('best quality is stated honestly', /Hi-Res FLAC 24\/96/.test(sheet), sheet.slice(0,200));
 check('per-track quality shown', /FLAC lossless/.test(sheet));
 check('the lossy duplicate is not offered', !/MP3 VBR/.test(sheet));
+
+/* A network that accepts the connection and then says nothing is the worst
+   case: nothing fails, so without a clock of its own the search would spin for
+   ever. The clock is an argument, so this asks for a short one. */
+const timedOut = await page.evaluate(async () => {
+  const real = window.fetch;
+  // Accepted and never answered, but it does honour an abort, the way a real
+  // fetch does — which is what the clock relies on.
+  window.fetch = (url, opts) => new Promise((resolve, reject) => {
+    const signal = opts && opts.signal;
+    if (signal) signal.addEventListener('abort', () => {
+      const e = new Error('aborted'); e.name = 'AbortError'; reject(e);
+    }, { once: true });
+  });
+  try {
+    const { search } = await import('./js/discover.js');
+    await search('anything', { patience: 250 });
+    return { threw: false };
+  } catch (err) {
+    return { threw: true, message: String(err.message || err) };
+  } finally {
+    window.fetch = real;
+  }
+});
+check('a silent network ends in an error, not a spinner',
+  timedOut.threw && /did not answer/i.test(timedOut.message || ''), JSON.stringify(timedOut));
 
 log(''); log('errors: ' + errors.length);
 for (const e of [...new Set(errors)].slice(0,5)) log('  '+e);

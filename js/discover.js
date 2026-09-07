@@ -41,13 +41,32 @@ function gradeFile(file) {
   return { rank: 0, tier: 'compressed', label: format || 'Unknown' };
 }
 
-async function getJson(url, signal) {
+/**
+ * How long to wait for the archive before giving up.
+ *
+ * A dead network usually fails fast, but a captive portal or a proxy that
+ * accepts the connection and then says nothing does not fail at all, and a
+ * spinner that never ends is worse than an error.
+ */
+export const PATIENCE = 12000;
+
+async function getJson(url, signal, patience = PATIENCE) {
+  const clock = new AbortController();
+  const timer = setTimeout(() => clock.abort(new DiscoverError('timeout')), patience);
+  const stop = () => clock.abort(new DiscoverError('cancelled'));
+  if (signal) signal.addEventListener('abort', stop, { once: true });
+
   let res;
   try {
-    res = await fetch(url, { signal, mode: 'cors' });
+    res = await fetch(url, { signal: clock.signal, mode: 'cors' });
   } catch (err) {
-    if (err && err.name === 'AbortError') throw err;
+    // The caller's own abort still has to read as an abort; ours is a timeout.
+    if (signal && signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+    if (clock.signal.aborted) throw new DiscoverError('The archive did not answer. Try again in a moment.');
     throw new DiscoverError('Could not reach the archive. Check your connection.');
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', stop);
   }
   if (!res.ok) throw new DiscoverError('The archive answered ' + res.status + '.');
   return res.json();
@@ -58,7 +77,7 @@ async function getJson(url, signal) {
  * @param {string} query
  * @param {{ kind?: 'all'|'artist'|'album'|'song'|'genre', signal?: AbortSignal }} options
  */
-export async function search(query, { kind = 'all', signal } = {}) {
+export async function search(query, { kind = 'all', signal, patience } = {}) {
   const text = query.trim();
   if (!text) return [];
 
@@ -81,7 +100,7 @@ export async function search(query, { kind = 'all', signal } = {}) {
   params.set('page', '1');
   params.set('output', 'json');
 
-  const data = await getJson(SEARCH + '?' + params, signal);
+  const data = await getJson(SEARCH + '?' + params, signal, patience);
   const docs = (data.response && data.response.docs) || [];
 
   return docs.map((doc) => ({
@@ -109,8 +128,8 @@ function licenceName(url) {
 }
 
 /** Full detail for one release: its tracks and the best file for each. */
-export async function release(id, signal) {
-  const data = await getJson(META + encodeURIComponent(id), signal);
+export async function release(id, signal, patience) {
+  const data = await getJson(META + encodeURIComponent(id), signal, patience);
   const meta = data.metadata || {};
   const restricted = String(meta['access-restricted-item'] || '') === 'true';
 

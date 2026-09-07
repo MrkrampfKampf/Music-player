@@ -41,9 +41,12 @@ export function trackRow(track, context, options = {}) {
     row.append(artNode(track.artworkKey));
   }
 
+  // The quality mark belongs with the running time at the end of the line, not
+  // in the middle of the artist's name.
   const sub = el('span', { class: 'row-sub' });
-  if (isHiRes(track)) sub.append(el('span', { class: 'badge hi', text: 'Hi-Res' }));
-  else if (track.lossless) sub.append(el('span', { class: 'badge', text: 'Lossless' }));
+  let quality = null;
+  if (isHiRes(track)) quality = el('span', { class: 'badge hi', text: 'Hi-Res' });
+  else if (track.lossless) quality = el('span', { class: 'badge', text: 'Lossless' });
 
   let caption;
   if (hideArtist) caption = track.artist === hideArtist ? '' : track.artist;
@@ -56,6 +59,7 @@ export function trackRow(track, context, options = {}) {
 
   // Dot leaders run out to the time, the way a printed track listing does.
   row.append(el('span', { class: 'leader', 'aria-hidden': 'true' }));
+  if (quality) row.append(quality);
   row.append(el('span', { class: 'row-time num', text: formatTime(track.duration) }));
 
   const more = el('span', { class: 'icon-btn row-more', role: 'button', tabindex: '0', 'aria-label': 'More options' }, icon('more'));
